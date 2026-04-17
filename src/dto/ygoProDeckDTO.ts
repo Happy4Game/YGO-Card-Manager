@@ -11,11 +11,10 @@ export class YGOProDeckDTO {
   async list(options: CardSearchParameters) {
     let queryString = ''
     for (const [key, value] of Object.entries(options)) {
-      queryString += `${key}=${value.toString()}&`
+      if (!(key === 'language' && value === 'en')) queryString += `${key}=${value.toString()}&`
     }
-    const response = await axios.get(
-      `https://db.ygoprodeck.com/api/v7/cardinfo.php?${queryString}language=fr`,
-    )
+
+    const response = await axios.get(`https://db.ygoprodeck.com/api/v7/cardinfo.php?${queryString}`)
     const responseArray: Array<Card> = []
     for (const obj of response.data.data) {
       responseArray.push(this.convertObjectToCard(obj))

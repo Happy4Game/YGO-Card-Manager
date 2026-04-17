@@ -23,4 +23,5 @@ export type CardSearchParameters = {
   staple?: boolean //- Check if card is a staple.
   has_effect?: boolean //- Check if a card actually has an effect or not by passing a boolean true/false. Examples of cards that do not have an actual effect: Black Skull Dragon, LANphorhynchus, etc etc.
   //startdate, enddate and dateregion - Filter based on cards' release date. Format dates as YYYY-mm-dd. Pass dateregion as tcg (default) or ocg.
+  language: string
 }
