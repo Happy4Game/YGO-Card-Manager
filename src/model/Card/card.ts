@@ -1,4 +1,5 @@
 import type { CardFrameType } from './cardFrameType'
+import type { CardPrice } from './cardPrice'
 import type { CardType } from './cardType'
 
 export class Card {
@@ -8,7 +9,7 @@ export class Card {
   frameType: CardFrameType
   desc: string
   ygoprodeck_url: string
-  card_prices: string
+  card_prices: CardPrice
 
   constructor(
     id: number,
@@ -17,7 +18,7 @@ export class Card {
     frameType: CardFrameType,
     desc: string,
     ygoprodeck_url: string,
-    card_prices: string,
+    card_prices: CardPrice,
   ) {
     this.id = id
     this.name = name

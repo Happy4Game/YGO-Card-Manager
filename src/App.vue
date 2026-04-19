@@ -5,8 +5,14 @@ import { Card } from './model/Card/card'
 import type { CardSearchParameters } from './model/Card/cardSearchParameter'
 import { CardType } from './model/Card/cardType'
 import { CardRace } from './model/Card/cardRace'
+import { CardMonster } from './model/Card/cardMonster'
+import type { CardSpell } from './model/Card/cardSpell'
+import type { CardPendulum } from './model/Card/cardPendulum'
+import type { CardAchetype } from './model/Card/cardArchetype'
+import type { CardLink } from './model/Card/cardLink'
 
-const cardsInfo = ref<Card[]>()
+const cardsInfo =
+  ref<Array<Card | CardMonster | CardLink | CardAchetype | CardPendulum | CardSpell>>()
 const cardSearchParameter = reactive<CardSearchParameters>({ language: 'en' })
 
 const querySelectorAll: NodeList<Element> = (query: string) => {
@@ -128,9 +134,37 @@ const promiseError = ref<string>()
     </button>
     <p v-if="promiseStatus === 'pending'">Request pending</p>
     <p v-else-if="promiseStatus === 'error' && cardsInfo?.length === 0">No result found</p>
-    <template v-for="(item, index) in cardsInfo" :key="index">
-      <div>{{ item.name }}</div>
-    </template>
+    <table v-else>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Level</th>
+          <th>Type</th>
+          <th>Price Cardmarket</th>
+          <th>Quantity</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(item, index) in cardsInfo" :key="index">
+          <td>
+            <a :href="item.ygoprodeck_url" target="_blank">{{ item.name }}</a>
+          </td>
+          <td>
+            <template v-if="item instanceof CardMonster">
+              {{ item.level !== 0 ? item.level : '' }}
+            </template>
+          </td>
+          <td>
+            <template v-if="item instanceof CardMonster">
+              {{ item.type }}
+            </template>
+          </td>
+          <td>{{ item.card_prices.cardmarket_price }}€</td>
+          <td>0</td>
+          <td><button>Ajouter</button></td>
+        </tr>
+      </tbody>
+    </table>
   </main>
 </template>
 
@@ -138,5 +172,12 @@ const promiseError = ref<string>()
 .wrapper {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
+}
+table {
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  text-align: center;
+  border: solid 1px black;
 }
 </style>

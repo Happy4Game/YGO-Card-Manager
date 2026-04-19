@@ -15,7 +15,7 @@ export class YGOProDeckDTO {
     }
 
     const response = await axios.get(`https://db.ygoprodeck.com/api/v7/cardinfo.php?${queryString}`)
-    const responseArray: Array<Card> = []
+    const responseArray: Array<Card | CardLink | CardAchetype | CardPendulum | CardSpell> = []
     for (const obj of response.data.data) {
       responseArray.push(this.convertObjectToCard(obj))
     }
@@ -33,10 +33,10 @@ export class YGOProDeckDTO {
       ygoCard.frameType,
       ygoCard.desc,
       ygoCard.ygoprodeck_url,
-      ygoCard.card_prices,
+      ygoCard.card_prices[0],
     )
     if (ygoCardKeys.includes('atk')) {
-      let monsterCard: CardMonster = new CardMonster(
+      const monsterCard: CardMonster = new CardMonster(
         basicCard,
         ygoCard.atk,
         ygoCard.def,
@@ -45,13 +45,14 @@ export class YGOProDeckDTO {
         ygoCard.attribute,
       )
       if (ygoCardKeys.includes('scale')) return new CardPendulum(monsterCard, ygoCard.scale)
-      if (ygoCardKeys.includes('linkval'))
+      if (ygoCardKeys.includes('linkval')) {
         return new CardLink(monsterCard, ygoCard.linkval, ygoCard.linkmarkers)
+      }
+      return monsterCard
     } else if (ygoCardKeys.includes('archetype')) {
       return new CardAchetype(basicCard, ygoCard.archetype)
     } else {
       return new CardSpell(basicCard, ygoCard.race)
     }
-    return basicCard
   }
 }
