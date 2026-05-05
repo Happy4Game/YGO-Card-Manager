@@ -69,3 +69,10 @@ npm run test:e2e -- --debug
 ```sh
 npm run lint
 ```
+
+## Deploy
+
+```sh
+docker build -t ygo-card-manager .
+docker run -d -p 80:80 --rm --name ygo-front ygo-card-manager
+```
