@@ -18,6 +18,5 @@ jobs:
     #runs-on: ubuntu-latest
     runs-on: self-hosted
     steps:
-    - uses: actions/checkout@v4
-    - name: 
+    - name: Run the docker image
       run: docker run -d -p 80:80 --rm --name ygo-front ygo-card-manager
