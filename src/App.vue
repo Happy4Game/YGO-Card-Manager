@@ -15,7 +15,7 @@ const cardsInfo =
   ref<Array<Card | CardMonster | CardLink | CardAchetype | CardPendulum | CardSpell>>()
 const cardSearchParameter = reactive<CardSearchParameters>({ language: 'en' })
 
-const querySelectorAll: NodeList<Element> = (query: string) => {
+const querySelectorAll = <T extends Element>(query: string): NodeListOf<T> => {
   return document.querySelectorAll(query)
 }
 const promiseStatus = ref<string>()
@@ -68,7 +68,7 @@ const promiseError = ref<string>()
       <button
         v-on:click="
           () => {
-            for (const value of querySelectorAll(`input[name='type']`)) {
+            for (const value of querySelectorAll<HTMLInputElement>(`input[name='type']`)) {
               value.checked = false
             }
             delete cardSearchParameter.type
@@ -101,7 +101,7 @@ const promiseError = ref<string>()
       <button
         v-on:click="
           () => {
-            for (const value of querySelectorAll(`input[name='race']`)) {
+            for (const value of querySelectorAll<HTMLInputElement>(`input[name='race']`)) {
               value.checked = false
             }
             delete cardSearchParameter.race
