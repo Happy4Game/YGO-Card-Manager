@@ -20,3 +20,8 @@ export function makeCard(overrides: Partial<CardData> = {}): CardData {
     ...overrides,
   }
 }
+
+/** Dernier élément d'une liste (équivalent de `Array.prototype.at(-1)`, absent de la lib TS des tests). */
+export function lastOf<T>(list: readonly T[] | undefined): T | undefined {
+  return list === undefined ? undefined : list[list.length - 1]
+}
