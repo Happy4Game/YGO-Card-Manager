@@ -2,13 +2,14 @@
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import CollectionEntryForm from '@/components/collection/CollectionEntryForm.vue'
-import CollectionEntryItem from '@/components/collection/CollectionEntryItem.vue'
+import CollectionCardGroup from '@/components/collection/CollectionCardGroup.vue'
 import CollectionFilters from '@/components/collection/CollectionFilters.vue'
 import CollectionStats from '@/components/collection/CollectionStats.vue'
 import CollectionTransfer from '@/components/collection/CollectionTransfer.vue'
 import { routes } from '@/lib/routes'
 import {
   fallbackCardName,
+  groupByCard,
   type CollectionItem,
   type NewCollectionEntry,
 } from '@/services/collection'
@@ -36,6 +37,22 @@ watch(ownedIds, (ids) => {
     void prices.loadLatest(ids)
   }
 })
+
+/**
+ * Une ligne par carte (« dossier ») ; ses versions s'affichent quand on l'ouvre.
+ * S'il ne reste qu'une carte (ex. recherche « ash »), elle est ouverte d'office.
+ */
+const groups = computed(() => groupByCard(items.value, sort.value))
+const openGroups = ref(new Set<number>())
+// `openGroups` retient les dossiers « basculés » : ouverts d'habitude, fermés si seuls.
+function isOpen(cardId: number) {
+  return openGroups.value.has(cardId) !== (groups.value.length === 1)
+}
+function toggleGroup(cardId: number) {
+  const next = new Set(openGroups.value)
+  if (!next.delete(cardId)) next.add(cardId)
+  openGroups.value = next
+}
 
 /** Formulaire ouvert : ajout (carte et impression éventuellement pré-remplies) ou modification. */
 type FormState =
@@ -270,14 +287,20 @@ async function remove(item: CollectionItem) {
             @reset="store.resetFilters"
           />
 
-          <p class="count muted">{{ items.length }} entrée(s) affichée(s)</p>
+          <p class="count muted">
+            {{ groups.length }} carte{{ groups.length > 1 ? 's' : '' }} ·
+            {{ items.length }} version{{ items.length > 1 ? 's' : '' }}
+          </p>
 
           <ul v-if="items.length > 0" class="list">
-            <CollectionEntryItem
-              v-for="item in items"
-              :key="item.id"
-              :item="item"
-              :price="prices.latest.get(item.cardId)"
+            <CollectionCardGroup
+              v-for="group in groups"
+              :key="group.cardId"
+              :group="group"
+              :open="isOpen(group.cardId)"
+              :price="prices.latest.get(group.cardId)"
+              @toggle="toggleGroup(group.cardId)"
+              @add-version="openForm({ mode: 'create', cardId: $event })"
               @increment="changeQuantity($event, 1)"
               @decrement="changeQuantity($event, -1)"
               @edit="openForm({ mode: 'edit', entry: $event })"
@@ -349,6 +372,8 @@ async function remove(item: CollectionItem) {
 .list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  /* Un dossier ouvert ne doit pas étirer ses voisins fermés. */
+  align-items: start;
   gap: var(--space-3);
   padding: 0;
   margin: 0;

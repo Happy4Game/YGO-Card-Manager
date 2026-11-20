@@ -66,3 +66,47 @@ test('ajoute, incrémente puis supprime une entrée', async ({ page }) => {
   await expect(page.getByText('Ta collection est vide.')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Mes cartes' })).toBeFocused()
 })
+
+test('regroupe les versions d’une carte dans un dossier', async ({ page }) => {
+  // Trois ajouts : deux raretés de la même carte (fictive) et une autre carte.
+  const add = async (cardId: string, code: string, rarity: string) => {
+    await page.goto(`/collection/?add=${cardId}&set=${code}`)
+    const form = page.getByRole('form', { name: 'Ajouter une carte' })
+    const choice = form.getByLabel('Rareté')
+    await choice.selectOption('__other__')
+    await form.getByLabel('Nouvelle rareté').fill(rarity)
+    await form.getByRole('button', { name: 'Enregistrer' }).click()
+    await expect(form).toBeHidden()
+  }
+  await add('12345678', 'TST-FR001', 'Common')
+  await add('12345678', 'TST-FR001', 'Secret Rare')
+  await add('87654321', 'AUT-FR002', 'Rare')
+
+  await expect(page.getByText('2 cartes · 3 versions')).toBeVisible()
+  const folder = page.getByRole('button', { name: 'Carte #12345678', exact: true })
+  await expect(folder).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByText('2 exemplaires · 2 versions')).toBeVisible()
+
+  await folder.click()
+  await expect(folder).toHaveAttribute('aria-expanded', 'true')
+  const common = page.getByRole('article', { name: 'Carte #12345678 : TST-FR001 · Common' })
+  const secret = page.getByRole('article', { name: 'Carte #12345678 : TST-FR001 · Secret Rare' })
+  await expect(common).toBeVisible()
+  await expect(secret).toBeVisible()
+
+  // Chaque version a sa propre quantité.
+  await secret
+    .getByRole('button', {
+      name: 'Ajouter un exemplaire de Carte #12345678 (TST-FR001 · Secret Rare)',
+    })
+    .click()
+  await expect(secret).toContainText('Quantité : 2')
+  await expect(common).toContainText('Quantité : 1')
+
+  // Une recherche qui ne laisse qu'une carte ouvre son dossier d'office.
+  await page.getByLabel('Nom ou code').fill('AUT')
+  await expect(page.getByRole('button', { name: 'Carte #87654321', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  )
+})

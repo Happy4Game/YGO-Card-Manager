@@ -117,11 +117,16 @@ function assertQuantity(quantity: number): void {
   }
 }
 
-/** Deux entrées décrivent les mêmes exemplaires si ces cinq champs sont identiques. */
+/**
+ * Deux entrées décrivent les mêmes exemplaires (une même « version ») si la carte, le code
+ * d'impression, la rareté, la langue, l'état et l'emplacement sont identiques. Une autre
+ * rareté ou un autre état donne une version distincte, modifiable séparément.
+ */
 function isSameCopy(a: Omit<CollectionEntry, 'id'>, b: Omit<CollectionEntry, 'id'>): boolean {
   return (
     a.cardId === b.cardId &&
-    a.setCode === b.setCode &&
+    a.setCode.toUpperCase() === b.setCode.toUpperCase() &&
+    a.rarity.toLowerCase() === b.rarity.toLowerCase() &&
     a.language === b.language &&
     a.condition === b.condition &&
     a.location === b.location
@@ -129,8 +134,8 @@ function isSameCopy(a: Omit<CollectionEntry, 'id'>, b: Omit<CollectionEntry, 'id
 }
 
 /**
- * Ajoute des exemplaires. Si une entrée identique existe déjà (même carte, impression, langue,
- * état et emplacement), sa quantité est augmentée au lieu de créer un doublon.
+ * Ajoute des exemplaires. Si une entrée identique existe déjà (même carte, impression, rareté,
+ * langue, état et emplacement), sa quantité est augmentée au lieu de créer un doublon.
  *
  * La transaction garantit que la lecture puis l'écriture ne sont pas entrecoupées par une autre
  * écriture (doc : https://dexie.org/docs/Dexie/Dexie.transaction()).
@@ -158,18 +163,35 @@ export async function addEntry(db: AppDatabase, input: NewCollectionEntry): Prom
   })
 }
 
-/** Modifie une entrée existante. Lève une erreur si elle n'existe pas. */
+/**
+ * Modifie une entrée existante. Lève une erreur si elle n'existe pas.
+ * Si la modification la rend identique à une autre version déjà possédée, les deux sont
+ * fusionnées (quantités additionnées) pour ne jamais avoir deux lignes pour la même version.
+ *
+ * @returns l'id de l'entrée qui porte désormais ces exemplaires.
+ */
 export async function updateEntry(
   db: AppDatabase,
   id: number,
   changes: CollectionEntryChanges,
-): Promise<void> {
-  await db.transaction('rw', db.collection, async () => {
+): Promise<number> {
+  return db.transaction('rw', db.collection, async () => {
     const current = await db.collection.get(id)
     if (!current) throw new CollectionError('Cette entrée n’existe plus.')
     // On revalide l'entrée complète, pour ne jamais enregistrer un état incohérent.
     const next = normalizeEntry({ ...current, ...changes })
+    const twin = await db.collection
+      .where('cardId')
+      .equals(next.cardId)
+      .filter((candidate) => candidate.id !== id && isSameCopy(candidate, next))
+      .first()
+    if (twin?.id !== undefined) {
+      await db.collection.update(twin.id, { quantity: twin.quantity + next.quantity })
+      await db.collection.delete(id)
+      return twin.id
+    }
     await db.collection.put({ ...next, id })
+    return id
   })
 }
 
@@ -283,6 +305,52 @@ export async function listEntries(
   const factor = sort.direction === 'asc' ? 1 : -1
   // L'id sert de départage pour un ordre stable et prévisible.
   return filtered.sort((a, b) => factor * (compareItems(a, b, sort.key) || a.id - b.id))
+}
+
+/** Toutes les versions possédées d'une même carte, présentées comme un « dossier ». */
+export interface CollectionGroup {
+  cardId: number
+  cardName: string
+  cardKnown: boolean
+  /** Versions (code, rareté, langue, état, emplacement), dans l'ordre de la liste. */
+  items: CollectionItem[]
+  totalCopies: number
+  /** Raretés distinctes possédées, pour un aperçu sans ouvrir le dossier. */
+  rarities: string[]
+}
+
+/**
+ * Regroupe les entrées par carte, en gardant l'ordre de la liste triée (un groupe apparaît
+ * à la place de sa première version). Trié par quantité, on compare le total du groupe.
+ */
+export function groupByCard(
+  items: readonly CollectionItem[],
+  sort?: CollectionSort,
+): CollectionGroup[] {
+  const groups = new Map<number, CollectionGroup>()
+  for (const item of items) {
+    let group = groups.get(item.cardId)
+    if (!group) {
+      group = {
+        cardId: item.cardId,
+        cardName: item.cardName,
+        cardKnown: item.cardKnown,
+        items: [],
+        totalCopies: 0,
+        rarities: [],
+      }
+      groups.set(item.cardId, group)
+    }
+    group.items.push(item)
+    group.totalCopies += item.quantity
+    if (item.rarity && !group.rarities.includes(item.rarity)) group.rarities.push(item.rarity)
+  }
+  const list = [...groups.values()]
+  if (sort?.key === 'quantity') {
+    const factor = sort.direction === 'asc' ? 1 : -1
+    list.sort((a, b) => factor * (a.totalCopies - b.totalCopies))
+  }
+  return list
 }
 
 function countBy(entries: readonly CollectionEntry[], keyOf: (e: CollectionEntry) => string) {

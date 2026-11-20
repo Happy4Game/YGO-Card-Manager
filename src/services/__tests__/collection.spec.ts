@@ -8,6 +8,7 @@ import {
   CollectionError,
   findCard,
   getStats,
+  groupByCard,
   listEntries,
   listLocations,
   removeEntry,
@@ -62,6 +63,51 @@ describe('services/collection', () => {
 
   afterAll(async () => {
     await db.delete()
+  })
+
+  describe('versions distinctes', () => {
+    it('une autre rareté du même code crée une version séparée', async () => {
+      const common = await addEntry(db, entry())
+      const secret = await addEntry(db, entry({ rarity: 'Secret Rare' }))
+      expect(secret).not.toBe(common)
+      // Même rareté, casse différente : même version.
+      expect(await addEntry(db, entry({ rarity: 'secret rare', setCode: 'tst-fr001' }))).toBe(
+        secret,
+      )
+      expect(await db.collection.count()).toBe(2)
+    })
+
+    it('modifier une version pour la rendre identique à une autre les fusionne', async () => {
+      const common = await addEntry(db, entry({ quantity: 2 }))
+      const secret = await addEntry(db, entry({ rarity: 'Secret Rare', quantity: 1 }))
+      expect(await updateEntry(db, secret, { rarity: 'Common' })).toBe(common)
+      expect(await db.collection.count()).toBe(1)
+      expect(await db.collection.get(common)).toMatchObject({ quantity: 3 })
+    })
+
+    it('modifier une version ne touche pas les autres', async () => {
+      const common = await addEntry(db, entry({ quantity: 2 }))
+      const secret = await addEntry(db, entry({ rarity: 'Secret Rare' }))
+      expect(await updateEntry(db, secret, { condition: 'Played' })).toBe(secret)
+      expect(await db.collection.get(common)).toMatchObject({
+        rarity: 'Common',
+        condition: 'Near Mint',
+        quantity: 2,
+      })
+    })
+
+    it('groupByCard range les versions par carte avec le total et les raretés', async () => {
+      await addEntry(db, entry({ quantity: 2 }))
+      await addEntry(db, entry({ rarity: 'Secret Rare' }))
+      await addEntry(db, entry({ cardId: 22222222 }))
+      const groups = groupByCard(await listEntries(db, {}, { key: 'name', direction: 'asc' }))
+      expect(groups.map((group) => [group.cardName, group.totalCopies, group.rarities])).toEqual([
+        ['Archer Imaginaire', 1, ['Common']],
+        ['Dragon de Démonstration', 3, ['Common', 'Secret Rare']],
+      ])
+      const byQuantity = groupByCard(await listEntries(db), { key: 'quantity', direction: 'desc' })
+      expect(byQuantity[0]?.cardName).toBe('Dragon de Démonstration')
+    })
   })
 
   describe('addEntry', () => {

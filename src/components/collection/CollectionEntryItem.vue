@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { nextTick, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import type { CollectionItem } from '@/services/collection'
 import CardImage from '@/components/common/CardImage.vue'
 import PriceTag from '@/components/prices/PriceTag.vue'
 import type { PricePoint } from '@/domain/price'
 import { CONDITION_LABELS, languageLabel, locationLabel } from './labels'
 
-const props = defineProps<{ item: CollectionItem; price?: PricePoint }>()
+const props = defineProps<{
+  item: CollectionItem
+  price?: PricePoint
+  /** Affichée dans le « dossier » de sa carte : pas de miniature, la version sert de titre. */
+  grouped?: boolean
+}>()
 const emit = defineEmits<{
   increment: [item: CollectionItem]
   decrement: [item: CollectionItem]
@@ -21,6 +26,15 @@ const cancelButton = useTemplateRef<HTMLButtonElement>('cancelButton')
 
 // Identifiants uniques pour relier titre et texte de confirmation (aria-labelledby/describedby).
 const titleId = `entry-${props.item.id}-title`
+
+/** « TST-FR001 · Common » : ce qui distingue une version des autres exemplaires de la carte. */
+const versionLabel = computed(() =>
+  [props.item.setCode || 'Code inconnu', props.item.rarity].filter(Boolean).join(' · '),
+)
+/** Nom donné aux boutons : unique même quand la carte a plusieurs versions. */
+const accessibleName = computed(() =>
+  props.grouped ? `${props.item.cardName} (${versionLabel.value})` : props.item.cardName,
+)
 const confirmTextId = `entry-${props.item.id}-confirm`
 
 async function askDelete() {
@@ -49,19 +63,24 @@ function decrement() {
 <template>
   <li class="entry">
     <article class="entry__card" :aria-labelledby="titleId">
-      <CardImage v-if="item.cardKnown" :card-id="item.cardId" class="entry__thumb" />
+      <CardImage v-if="item.cardKnown && !grouped" :card-id="item.cardId" class="entry__thumb" />
       <div class="entry__body">
-        <h3 :id="titleId" class="entry__name">{{ item.cardName }}</h3>
+        <h4 v-if="grouped" :id="titleId" class="entry__name entry__name--version">
+          <span class="visually-hidden">{{ item.cardName }} : </span>{{ versionLabel }}
+        </h4>
+        <h3 v-else :id="titleId" class="entry__name">{{ item.cardName }}</h3>
         <p class="entry__details">
-          <span class="badge">{{ item.setCode || 'Code inconnu' }}</span>
-          <span v-if="item.rarity" class="badge badge--accent">{{ item.rarity }}</span>
+          <template v-if="!grouped">
+            <span class="badge">{{ item.setCode || 'Code inconnu' }}</span>
+            <span v-if="item.rarity" class="badge badge--accent">{{ item.rarity }}</span>
+          </template>
           <span class="chip">{{ languageLabel(item.language) }}</span>
           <span class="chip">{{ CONDITION_LABELS[item.condition] }}</span>
           <span class="chip">{{ locationLabel(item.location) }}</span>
         </p>
         <p v-if="item.note" class="entry__note">{{ item.note }}</p>
         <PriceTag
-          v-if="item.cardKnown"
+          v-if="item.cardKnown && !grouped"
           :card-id="item.cardId"
           :card-name="item.cardName"
           :price="price"
@@ -73,7 +92,7 @@ function decrement() {
           <button
             type="button"
             class="btn--icon btn--ghost"
-            :aria-label="`Retirer un exemplaire de ${item.cardName}`"
+            :aria-label="`Retirer un exemplaire de ${accessibleName}`"
             @click="decrement"
           >
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -86,7 +105,7 @@ function decrement() {
           <button
             type="button"
             class="btn--icon btn--ghost"
-            :aria-label="`Ajouter un exemplaire de ${item.cardName}`"
+            :aria-label="`Ajouter un exemplaire de ${accessibleName}`"
             @click="emit('increment', item)"
           >
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -102,7 +121,7 @@ function decrement() {
 
         <div v-if="!confirming" class="entry__actions">
           <button type="button" class="btn--ghost btn--sm" @click="emit('edit', item)">
-            Modifier<span class="visually-hidden"> {{ item.cardName }}</span>
+            Modifier<span class="visually-hidden"> {{ accessibleName }}</span>
           </button>
           <button
             ref="deleteButton"
@@ -110,7 +129,7 @@ function decrement() {
             class="btn--ghost btn--sm entry__delete"
             @click="askDelete"
           >
-            Supprimer<span class="visually-hidden"> {{ item.cardName }}</span>
+            Supprimer<span class="visually-hidden"> {{ accessibleName }}</span>
           </button>
         </div>
       </div>
@@ -122,7 +141,7 @@ function decrement() {
         :aria-describedby="confirmTextId"
         @keydown.escape="cancelDelete"
       >
-        <p :id="confirmTextId">Supprimer « {{ item.cardName }} » de la collection ?</p>
+        <p :id="confirmTextId">Supprimer « {{ accessibleName }} » de la collection ?</p>
         <div class="confirm__actions">
           <button type="button" class="btn--danger" @click="emit('remove', item)">
             Oui, supprimer
@@ -191,6 +210,11 @@ function decrement() {
 
 .entry__name {
   overflow-wrap: anywhere;
+}
+
+.entry__name--version {
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
 }
 
 .entry__details {
