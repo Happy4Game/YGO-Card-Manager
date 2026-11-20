@@ -43,6 +43,17 @@ describe('useCardsStore', () => {
     expect(store.cardCount).toBe(2)
     expect(store.lastResult).toEqual({ status: 'updated', count: 2 })
     expect(fetchAllCards).toHaveBeenCalledWith('fr')
+    expect(store.revision).toBe(1)
+  })
+
+  it('ne change pas de révision quand les cartes sont déjà à jour', async () => {
+    vi.mocked(fetchDbVersion).mockResolvedValue('1.0')
+    vi.mocked(fetchAllCards).mockResolvedValue([makeCard({ id: 1 })])
+    const store = useCardsStore()
+    await store.sync()
+    await store.sync()
+    expect(store.lastResult?.status).toBe('up-to-date')
+    expect(store.revision).toBe(1)
   })
 
   it('expose un message en français en cas d’erreur', async () => {

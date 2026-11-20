@@ -15,6 +15,7 @@ import {
 const rawMonster = {
   id: 10000001,
   name: 'Golem de Test',
+  name_en: 'Test Golem',
   type: 'Effect Monster',
   frameType: 'effect',
   desc: 'Texte fictif.',
@@ -41,6 +42,7 @@ describe('toCardData', () => {
     expect(toCardData(rawMonster)).toEqual({
       id: 10000001,
       name: 'Golem de Test',
+      nameEn: 'Test Golem',
       type: 'Effect Monster',
       frameType: 'effect',
       desc: 'Texte fictif.',
@@ -73,6 +75,13 @@ describe('toCardData', () => {
     expect(card).not.toHaveProperty('def')
     expect(card).not.toHaveProperty('level')
     expect(card.sets).toEqual([])
+  })
+
+  it('omet le nom anglais quand il est absent, vide ou identique au nom', () => {
+    const base = { id: 4, type: 'Spell Card' }
+    expect(toCardData({ ...base, name: 'Sort', name_en: 'Sort' })).not.toHaveProperty('nameEn')
+    expect(toCardData({ ...base, name: 'Sort', name_en: '' })).not.toHaveProperty('nameEn')
+    expect(toCardData({ ...base, name: 'Sort', name_en: 42 })).not.toHaveProperty('nameEn')
   })
 
   it('ignore les champs facultatifs de mauvais type', () => {

@@ -1,5 +1,11 @@
 import type { AppDatabase } from '@/db/database'
 import type { CardData } from '@/domain/card'
+import { normalizeText } from '@/services/search/normalize'
+
+/**
+ * Recherche simple par filtres exacts (API historique, conservée pour compatibilité).
+ * La page de recherche utilise `@/services/search` (champ universel + mode avancé).
+ */
 
 /** Filtres de recherche ; un filtre vide ou absent est ignoré. */
 export interface CardSearchFilters {
@@ -24,14 +30,9 @@ export interface CardSearchResult {
 
 export const DEFAULT_PAGE_SIZE = 20
 
-/**
- * Met un texte sous une forme comparable : minuscules et sans accents.
- * `normalize('NFD')` sépare chaque lettre de son accent, qu'on retire ensuite.
- * Doc MDN : https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/String/normalize
- */
-export function normalizeText(text: string): string {
-  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-}
+// La normalisation vit désormais dans le module de recherche universelle ; réexportée ici
+// pour les modules qui l'importaient depuis cardSearch.
+export { normalizeText }
 
 function buildPredicate(filters: CardSearchFilters): (card: CardData) => boolean {
   const name = normalizeText(filters.name?.trim() ?? '')
