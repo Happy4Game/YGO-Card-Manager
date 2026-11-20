@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { CardData } from '@/domain/card'
+import CardImage from '@/components/common/CardImage.vue'
 
 const props = defineProps<{ card: CardData }>()
 
@@ -26,6 +27,7 @@ const subtitle = computed(() =>
 
 <template>
   <article class="card" :aria-labelledby="`card-${card.id}-name`">
+    <CardImage :card-id="card.id" class="thumb" />
     <h3 :id="`card-${card.id}-name`">{{ card.name }}</h3>
     <p class="subtitle">{{ subtitle }}</p>
     <dl v-if="stats.length > 0" class="stats">
@@ -48,7 +50,12 @@ const subtitle = computed(() =>
 </template>
 
 <style scoped>
+.thumb {
+  float: right;
+  margin: 0 0 0.5rem 0.75rem;
+}
 .card {
+  overflow: hidden;
   border: 1px solid #888;
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;

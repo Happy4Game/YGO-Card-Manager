@@ -21,6 +21,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Aucun asset de cartes versionné
+        run: npm run check:assets
       - name: Format
         run: npm run format:check
       - name: Lint

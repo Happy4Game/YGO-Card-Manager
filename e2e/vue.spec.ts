@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 // Aucun test ne doit joindre la vraie API : toute requête vers YGOPRODeck est interceptée.
 // Doc : https://playwright.dev/docs/network#handle-requests
 test.beforeEach(async ({ page }) => {
-  await page.route('https://db.ygoprodeck.com/**', (route) => route.abort())
+  await page.route(/https:\/\/(db|images)\.ygoprodeck\.com\//, (route) => route.abort())
 })
 
 test("affiche la page de recherche et la navigation à l'accueil", async ({ page }) => {

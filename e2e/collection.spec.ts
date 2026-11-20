@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test'
 
+test.beforeEach(async ({ page }) => {
+  await page.route(/https:\/\/(db|images)\.ygoprodeck\.com\//, (route) => route.abort())
+})
+
 // Chaque test Playwright démarre avec un contexte de navigateur neuf : IndexedDB est vide.
 // Aucun appel réseau : la carte 12345678 (fictive) n'est pas dans le cache local.
 

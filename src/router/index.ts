@@ -27,5 +27,5 @@ export const router = createRouter({
 })
 
 router.afterEach((to) => {
-  document.title = `${String(to.meta.title ?? '')} · YGO Card Manager`
+  document.title = `${String(to.meta.title ?? '')} · Card Manager`
 })

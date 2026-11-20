@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, useTemplateRef } from 'vue'
 import type { CollectionItem } from '@/services/collection'
+import CardImage from '@/components/common/CardImage.vue'
 import { CONDITION_LABELS, languageLabel, locationLabel } from './labels'
 
 const props = defineProps<{ item: CollectionItem }>()
@@ -46,6 +47,7 @@ function decrement() {
 <template>
   <li class="entry">
     <article :aria-labelledby="titleId">
+      <CardImage v-if="item.cardKnown" :card-id="item.cardId" class="thumb" />
       <h3 :id="titleId" class="name">{{ item.cardName }}</h3>
       <p class="details">
         <span>{{ item.setCode || 'Code inconnu' }}</span>
@@ -100,6 +102,10 @@ function decrement() {
 </template>
 
 <style scoped>
+.thumb {
+  float: right;
+  margin: 0 0 0.5rem 0.75rem;
+}
 .entry {
   list-style: none;
   border: 1px solid currentColor;

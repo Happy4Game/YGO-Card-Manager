@@ -1,7 +1,13 @@
 # YGO Card Manager
 
-Application web installable sur mobile (PWA) pour gérer sa collection de cartes à la maison.
-Les données restent sur ton appareil : pas de compte, pas de serveur.
+Application web installable sur mobile (PWA, nom affiché « Card Manager ») pour gérer sa
+collection de cartes à la maison. Les données restent sur ton appareil : pas de compte, pas de
+serveur, et l'app fonctionne hors ligne une fois les cartes téléchargées.
+
+## Installer l'app sur son téléphone
+
+- **Android (Chrome)** : ouvrir le site, menu ⋮ > « Installer l'application ».
+- **iPhone (Safari)** : bouton Partager > « Sur l'écran d'accueil ».
 
 > **Projet non officiel.** Ce projet n'est ni produit, ni approuvé, ni affilié à Konami Digital
 > Entertainment ou 4K Media. Yu-Gi-Oh! est une marque de Konami. Les noms, textes et illustrations
@@ -16,6 +22,11 @@ Les données restent sur ton appareil : pas de compte, pas de serveur.
   demande le [guide de l'API YGOPRODeck](https://ygoprodeck.com/api-guide/) (limite de 20 requêtes
   par seconde, pas de lien direct répété vers les images).
 - Usage personnel et non commercial : pas de publicité, pas de vente.
+- Les images de cartes sont chargées depuis le serveur de YGOPRODeck au premier affichage, puis
+  gardées dans le cache du service worker (300 images au maximum). Elles peuvent être désactivées
+  dans « À propos > Réglages ».
+- Le script `npm run check:assets` (lancé en CI) refuse toute image hors de `public/icons/` et tout
+  gros fichier JSON.
 - Aucune donnée personnelle n'est envoyée à un serveur, aucun traceur.
 - Les données de test sont fictives.
 
@@ -33,6 +44,7 @@ npm run format         # Prettier
 npm run type-check     # vue-tsc
 npm run build          # type-check + build de production
 npm run spike:api      # mesure CORS et taille des données de l'API (3 requêtes)
+npm run check:assets   # vérifie qu'aucun asset de cartes n'est versionné
 ```
 
 La CI (`.github/workflows/ci.yml`) vérifie le format, le lint, les types, les tests unitaires,
