@@ -16,6 +16,7 @@ export function makeCard(overrides: Partial<CardData> = {}): CardData {
     def: 800,
     level: 4,
     sets: [{ code: 'TST-FR001', name: 'Boîte de Test', rarity: 'Common' }],
+    setKeys: ['TST-001'],
     ...overrides,
   }
 }

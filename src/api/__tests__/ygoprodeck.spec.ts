@@ -51,6 +51,7 @@ describe('toCardData', () => {
       level: 4,
       archetype: 'Testeurs',
       sets: [{ code: 'TST-FR001', name: 'Boîte de Test', rarity: 'Rare' }],
+      setKeys: ['TST-001'],
     })
   })
 

@@ -28,6 +28,15 @@ export class AppDatabase extends Dexie {
       collection: '++id, cardId, setCode, location',
       meta: 'key',
     })
+    // v2 : index multiEntry (*) sur les clés de codes d'impression, pour le scan et la recherche.
+    // Le cache des cartes est reconstructible : on le vide et on force une resynchronisation.
+    // Doc : https://dexie.org/docs/Tutorial/Design#database-versioning
+    this.version(2)
+      .stores({ cards: 'id, name, type, archetype, *setKeys' })
+      .upgrade(async (tx) => {
+        await tx.table('cards').clear()
+        await tx.table('meta').where('key').startsWith('dbVersion:').delete()
+      })
   }
 }
 

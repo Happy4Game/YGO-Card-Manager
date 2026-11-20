@@ -11,6 +11,7 @@
  * venant du réseau, d'où le type `unknown` plutôt qu'un cast `as`.
  */
 import type { CardData, CardSet } from '@/domain/card'
+import { setCodeKey } from '@/domain/setCode'
 
 export const API_BASE_URL = 'https://db.ygoprodeck.com/api/v7'
 
@@ -91,6 +92,9 @@ export function toCardData(raw: unknown): CardData {
     throw new InvalidCardError(`Type manquant pour la carte ${id}`)
   }
 
+  const sets = Array.isArray(raw.card_sets)
+    ? raw.card_sets.map(toCardSet).filter((set): set is CardSet => set !== undefined)
+    : []
   const card: CardData = {
     id,
     name,
@@ -98,12 +102,15 @@ export function toCardData(raw: unknown): CardData {
     frameType: typeof raw.frameType === 'string' ? raw.frameType : '',
     desc: typeof raw.desc === 'string' ? raw.desc : '',
     race: typeof raw.race === 'string' ? raw.race : '',
-    sets: Array.isArray(raw.card_sets)
-      ? raw.card_sets.map(toCardSet).filter((set): set is CardSet => set !== undefined)
-      : [],
+    sets,
+    setKeys: [
+      ...new Set(sets.map((set) => setCodeKey(set.code)).filter((key) => key !== undefined)),
+    ],
   }
 
   // On n'ajoute les champs facultatifs que s'ils existent, pour garder des objets compacts.
+  const typeLabel = optionalString(raw.humanReadableCardType)
+  if (typeLabel !== undefined) card.typeLabel = typeLabel
   const attribute = optionalString(raw.attribute)
   if (attribute !== undefined) card.attribute = attribute
   const archetype = optionalString(raw.archetype)

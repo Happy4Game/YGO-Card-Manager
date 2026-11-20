@@ -18,6 +18,8 @@ export interface CardData {
   name: string
   /** Type complet renvoyé par l'API, ex. "Effect Monster", "Spell Card". */
   type: string
+  /** Libellé lisible du type dans la langue téléchargée (champ `humanReadableCardType`). */
+  typeLabel?: string
   frameType: string
   desc: string
   /** Type de monstre (Warrior…) ou sous-type de Magie/Piège (Normal, Quick-Play…). */
@@ -31,4 +33,6 @@ export interface CardData {
   linkmarkers?: string[]
   archetype?: string
   sets: CardSet[]
+  /** Clés des codes d'impression sans région (voir `setCodeKey`), indexées pour la recherche. */
+  setKeys: string[]
 }
