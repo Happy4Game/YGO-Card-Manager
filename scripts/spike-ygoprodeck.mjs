@@ -45,7 +45,13 @@ const { body: allBody } = await probe(
 )
 try {
   const json = JSON.parse(new TextDecoder().decode(allBody))
-  console.log(`Nombre de cartes : ${json.data?.length ?? '(inconnu)'}`)
+  const cards = Array.isArray(json.data) ? json.data : []
+  console.log(`Nombre de cartes : ${cards.length}`)
+  const withSets = cards.filter((c) => Array.isArray(c.card_sets) && c.card_sets.length > 0)
+  console.log(`Cartes avec card_sets : ${withSets.length}`)
+  console.log(`Champs de la première carte : ${Object.keys(cards[0] ?? {}).join(', ')}`)
+  const img = cards[0]?.card_images?.[0]
+  console.log(`Exemple card_images : ${img ? Object.keys(img).join(', ') : '(absent)'}`)
 } catch {
   console.log('La réponse n’est pas du JSON valide.')
 }
