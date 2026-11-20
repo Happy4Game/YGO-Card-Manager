@@ -1,9 +1,16 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { db } from '@/db/database'
 import type { CardData } from '@/domain/card'
 import { rememberDefaults } from '@/services/quickAdd'
 import { makeCard } from '@/test/fixtures'
 import CollectionEntryForm from '../CollectionEntryForm.vue'
+
+// Base dédiée à ce fichier (la liste des raretés la lit).
+vi.mock('@/db/database', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/db/database')>()
+  return { ...original, db: new original.AppDatabase('test-entry-form') }
+})
 
 const twoPrints = makeCard({
   sets: [
@@ -32,6 +39,9 @@ function selectValue(wrapper: ReturnType<typeof mountForm>, text: string) {
 
 describe('CollectionEntryForm (ajout)', () => {
   beforeEach(() => localStorage.clear())
+  afterAll(async () => {
+    await db.delete()
+  })
 
   it('présélectionne l’impression lue, même avec une autre région', async () => {
     const wrapper = mountForm(twoPrints, 'AUT-EN007')
@@ -57,5 +67,39 @@ describe('CollectionEntryForm (ajout)', () => {
     const wrapper = mountForm(twoPrints)
     await flushPromises()
     expect(selectValue(wrapper, 'Impression')?.value).toBe('free')
+  })
+
+  it('propose les raretés existantes, celles de la carte en premier, et une saisie libre', async () => {
+    await db.cards.bulkPut([
+      twoPrints,
+      makeCard({ id: 2, sets: [{ code: 'XYZ-FR001', name: 'X', rarity: 'Secret Rare' }] }),
+    ])
+    const wrapper = mountForm(twoPrints, 'AUT-FR007')
+    await flushPromises()
+
+    // IndexedDB répond de façon asynchrone : on attend que la liste soit remplie.
+    await vi.waitFor(() => expect(wrapper.findAll('optgroup')).toHaveLength(2))
+    const rarity = selectValue(wrapper, 'Rareté')
+    expect(rarity?.value).toBe('Ultra Rare')
+    const groups = wrapper.findAll('optgroup')
+    expect(groups.map((group) => group.attributes('label'))).toEqual([
+      'Raretés de cette carte',
+      'Toutes les raretés',
+    ])
+    expect(groups[0]?.findAll('option').map((option) => option.text())).toEqual([
+      'Common',
+      'Ultra Rare',
+    ])
+    expect(groups[1]?.findAll('option').map((option) => option.text())).toEqual(['Secret Rare'])
+
+    // Une autre rareté que celle de l'impression : modifiable.
+    const select = wrapper.find(`select#${rarity?.id ?? ''}`)
+    await select.setValue('Secret Rare')
+    // « Autre » ouvre un champ libre.
+    await select.setValue('__other__')
+    await wrapper.find('input[placeholder="ex. Starlight Rare"]').setValue(' Rareté Maison ')
+    await wrapper.find('form').trigger('submit')
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ rarity: 'Rareté Maison' })
+    await db.cards.clear()
   })
 })

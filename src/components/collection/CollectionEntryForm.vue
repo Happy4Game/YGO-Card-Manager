@@ -102,6 +102,33 @@ const cardHint = computed(() => {
 })
 const knownSets = computed(() => card.value?.sets ?? [])
 
+/**
+ * Rareté : liste déroulante des raretés déjà existantes, celles des impressions de cette
+ * carte en premier, avec « Autre… » pour en saisir une nouvelle. Le choix d'une impression
+ * pré-remplit la rareté, qui reste modifiable (ex. une réimpression dans une autre rareté).
+ */
+const OTHER_RARITY = '__other__'
+const rarityFree = ref(false)
+const cardRarities = computed(() => [
+  ...new Set(knownSets.value.map((set) => set.rarity).filter(Boolean)),
+])
+const otherRarities = computed(() => {
+  const list = rarities.value.filter((rarity) => !cardRarities.value.includes(rarity))
+  // Une rareté saisie auparavant reste sélectionnable même si elle n'est plus connue.
+  const current = draft.rarity.trim()
+  if (current && !cardRarities.value.includes(current) && !list.includes(current)) {
+    list.unshift(current)
+  }
+  return list
+})
+const rarityChoice = computed({
+  get: () => (rarityFree.value ? OTHER_RARITY : draft.rarity),
+  set: (value: string) => {
+    rarityFree.value = value === OTHER_RARITY
+    if (!rarityFree.value) draft.rarity = value
+  },
+})
+
 watch(
   () => draft.setChoice,
   (choice) => {
@@ -111,6 +138,7 @@ watch(
       const sameKey = draft.setCode !== '' && setCodeKey(draft.setCode) === setCodeKey(set.code)
       if (!sameKey) draft.setCode = set.code
       draft.rarity = set.rarity
+      rarityFree.value = false
     }
   },
 )
@@ -131,7 +159,7 @@ function submit() {
   emit('submit', {
     cardId,
     setCode: draft.setCode,
-    rarity: draft.rarity,
+    rarity: draft.rarity.trim(),
     language: draft.language,
     condition: draft.condition,
     quantity: draft.quantity,
@@ -187,33 +215,49 @@ onMounted(() => heading.value?.focus())
       </select>
     </div>
 
-    <template v-if="draft.setChoice === FREE_SET">
-      <div class="field">
-        <label :for="fieldId('set-code')">Code d'impression</label>
-        <input
-          :id="fieldId('set-code')"
-          v-model="draft.setCode"
-          type="text"
-          autocomplete="off"
-          autocapitalize="characters"
-          spellcheck="false"
-          placeholder="ex. ABC-FR001"
-        />
-      </div>
-      <div class="field">
-        <label :for="fieldId('rarity')">Rareté</label>
-        <input
-          :id="fieldId('rarity')"
-          v-model="draft.rarity"
-          type="text"
-          autocomplete="off"
-          :list="fieldId('rarities')"
-        />
-        <datalist :id="fieldId('rarities')">
-          <option v-for="rarity in rarities" :key="rarity" :value="rarity" />
-        </datalist>
-      </div>
-    </template>
+    <div v-if="draft.setChoice === FREE_SET" class="field">
+      <label :for="fieldId('set-code')">Code d'impression</label>
+      <input
+        :id="fieldId('set-code')"
+        v-model="draft.setCode"
+        type="text"
+        autocomplete="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        placeholder="ex. ABC-FR001"
+      />
+    </div>
+
+    <div class="field">
+      <label :for="fieldId('rarity-choice')">Rareté</label>
+      <!-- <optgroup> regroupe les options sous un titre lu par les lecteurs d'écran.
+           Doc : https://developer.mozilla.org/fr/docs/Web/HTML/Element/optgroup -->
+      <select :id="fieldId('rarity-choice')" v-model="rarityChoice">
+        <option value="">Non précisée</option>
+        <optgroup v-if="cardRarities.length > 0" label="Raretés de cette carte">
+          <option v-for="rarity in cardRarities" :key="rarity" :value="rarity">
+            {{ rarity }}
+          </option>
+        </optgroup>
+        <optgroup v-if="otherRarities.length > 0" label="Toutes les raretés">
+          <option v-for="rarity in otherRarities" :key="rarity" :value="rarity">
+            {{ rarity }}
+          </option>
+        </optgroup>
+        <option :value="OTHER_RARITY">Autre (saisie libre)…</option>
+      </select>
+    </div>
+
+    <div v-if="rarityFree" class="field">
+      <label :for="fieldId('rarity')">Nouvelle rareté</label>
+      <input
+        :id="fieldId('rarity')"
+        v-model="draft.rarity"
+        type="text"
+        autocomplete="off"
+        placeholder="ex. Starlight Rare"
+      />
+    </div>
 
     <div class="field">
       <label :for="fieldId('language')">Langue</label>
