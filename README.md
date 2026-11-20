@@ -1,78 +1,49 @@
-# YGO-Card-Manager
+# YGO Card Manager
 
-## Recommended IDE Setup
+Application web installable sur mobile (PWA) pour gérer sa collection de cartes à la maison.
+Les données restent sur ton appareil : pas de compte, pas de serveur.
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+> **Projet non officiel.** Ce projet n'est ni produit, ni approuvé, ni affilié à Konami Digital
+> Entertainment ou 4K Media. Yu-Gi-Oh! est une marque de Konami. Les noms, textes et illustrations
+> des cartes appartiennent à leurs propriétaires. Les données de cartes proviennent de l'API publique
+> [YGOPRODeck](https://ygoprodeck.com/api-guide/).
 
-## Recommended Browser Setup
+## Principes « légal et ouvert »
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+- Le **code** est sous licence [MIT](LICENSE).
+- **Aucune image ni donnée de carte n'est versionnée dans ce dépôt ni hébergée par le projet.**
+  Chaque appareil télécharge ce dont il a besoin une seule fois et le garde en cache, comme le
+  demande le [guide de l'API YGOPRODeck](https://ygoprodeck.com/api-guide/) (limite de 20 requêtes
+  par seconde, pas de lien direct répété vers les images).
+- Usage personnel et non commercial : pas de publicité, pas de vente.
+- Aucune donnée personnelle n'est envoyée à un serveur, aucun traceur.
+- Les données de test sont fictives.
 
-## Type Support for `.vue` Imports in TS
+## Développement
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+Prérequis : Node.js 20.19+ ou 22.12+.
 
 ```sh
 npm install
+npm run dev            # serveur de développement
+npm run test:unit      # tests unitaires (Vitest)
+npm run test:e2e       # tests de bout en bout (Playwright)
+npm run lint           # oxlint + ESLint avec corrections
+npm run format         # Prettier
+npm run type-check     # vue-tsc
+npm run build          # type-check + build de production
+npm run spike:api      # mesure CORS et taille des données de l'API (3 requêtes)
 ```
 
-### Compile and Hot-Reload for Development
+La CI (`.github/workflows/ci.yml`) vérifie le format, le lint, les types, les tests unitaires,
+le build, l'audit de sécurité des dépendances et les tests e2e à chaque PR.
 
-```sh
-npm run dev
-```
+## Contribuer
 
-### Type-Check, Compile and Minify for Production
+Voir [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```sh
-npm run build
-```
+## Historique
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
-
-```sh
-npm run test:unit
-```
-
-### Run End-to-End Tests with [Playwright](https://playwright.dev)
-
-```sh
-# Install browsers for the first run
-npx playwright install
-
-# When testing on CI, must build the project first
-npm run build
-
-# Runs the end-to-end tests
-npm run test:e2e
-# Runs the tests only on Chromium
-npm run test:e2e -- --project=chromium
-# Runs the tests of a specific file
-npm run test:e2e -- tests/example.spec.ts
-# Runs the tests in debug mode
-npm run test:e2e -- --debug
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
-```
-
-## Deploy
-
-```sh
-docker build -t ygo-card-manager .
-docker run -d -p 80:80 --rm --name ygo-front ygo-card-manager
-```
+Une première version utilisait un backend Express + PostgreSQL (dépôt `YGO-Card-Manager-Back`).
+Il est abandonné au profit d'une approche local-first : la collection est stockée dans le
+navigateur (IndexedDB).
