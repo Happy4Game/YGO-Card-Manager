@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "npm run assets:ocr",
     "dev": "astro dev",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "astro preview",
     "test:unit": "vitest",
     "test:e2e": "playwright test",
+    "prebuild-only": "npm run assets:ocr",
     "build-only": "astro build",
     "type-check": "astro check && vue-tsc --build tsconfig.vue.json",
     "lint": "run-s lint:*",
@@ -19,15 +21,21 @@
     "format:check": "prettier --check src/ e2e/ scripts/ astro.config.ts",
     "spike:api": "node scripts/spike-ygoprodeck.mjs",
     "check:assets": "node scripts/check-no-card-assets.mjs",
-    "astro": "astro"
+    "astro": "astro",
+    "assets:ocr": "node scripts/copy-tesseract-assets.mjs"
   },
   "dependencies": {
     "@astrojs/vue": "^7.1.6",
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/fra": "1.0.0",
     "@vite-pwa/astro": "^2.0.3",
     "astro": "^7.4.13",
     "dexie": "^4.4.7",
     "pinia": "^4.1.0",
-    "vue": "^3.5.46"
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0",
+    "vue": "^3.5.46",
+    "wasm-feature-detect": "1.10.1"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",

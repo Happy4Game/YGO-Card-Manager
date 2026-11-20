@@ -61,12 +61,26 @@ export default defineConfig({
         // Les 4 pages HTML sont précachées : la navigation hors ligne fonctionne sur chacune.
         // (Le manifeste .webmanifest est ajouté au précache par le plugin lui-même.)
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        // Lecteur OCR (~7 Mo utiles sur 15) : pas dans le précache, téléchargé au premier scan
+        // puis gardé par la règle « ocr-assets » ci-dessous.
+        globIgnores: ['**/tesseract/**'],
         // Une URL inconnue hors ligne affiche la page d'accueil (Recherche).
         navigateFallback: base,
         // `?add=…&set=…` (lien « Ajouter à ma collection ») doit trouver /collection/ dans le cache.
         // Doc : https://developer.chrome.com/docs/workbox/modules/workbox-precaching#ignore_url_parameters
         ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^add$/, /^set$/],
         runtimeCaching: [
+          {
+            // Fichiers du lecteur OCR (worker, cœur WASM, langues), servis par notre site :
+            // gardés en cache au premier scan pour que le scan marche ensuite hors ligne.
+            urlPattern: ({ url }) => url.pathname.includes('/tesseract/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ocr-assets',
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 20, purgeOnQuotaError: true },
+            },
+          },
           {
             // Images de cartes : téléchargées une seule fois puis servies depuis le cache,
             // comme le demande https://ygoprodeck.com/api-guide/.

@@ -18,7 +18,15 @@ export default defineConfigWithVueTs(
     files: ['**/*.{vue,ts,mts,tsx}'],
   },
 
-  globalIgnores(['**/.claude/**', '**/dist/**', '**/dist-ssr/**', '**/coverage/**', '**/.astro/**']),
+  // public/tesseract/ : fichiers OCR tiers copiés au build (scripts/copy-tesseract-assets.mjs).
+  globalIgnores([
+    '**/.claude/**',
+    '**/dist/**',
+    '**/dist-ssr/**',
+    '**/coverage/**',
+    '**/.astro/**',
+    'public/tesseract/**',
+  ]),
 
   ...pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
