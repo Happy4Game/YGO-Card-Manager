@@ -42,6 +42,20 @@
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.08);
   --shadow-md: 0 6px 20px rgb(0 0 0 / 0.12);
   --transition-fast: 120ms ease-out;
+
+  /* Ajouts (refonte Astro) : teintes douces, contrastes de texte et dimensions de mise en page. */
+  --color-primary-soft: #e3eafc;
+  --color-danger-soft: #fbe9e7;
+  --color-danger-contrast: #ffffff;
+  --color-success-soft: #e3f3ea;
+  --color-accent-soft: #fbf1df;
+  --color-overlay: rgb(246 247 251 / 0.85);
+  --shadow-lg: 0 12px 32px rgb(20 26 38 / 0.16);
+  --transition-base: 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  --header-height: 3.5rem;
+  --tabbar-height: 4rem;
+  --content-max: 64rem;
+  --tap-target: 2.75rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -60,11 +74,19 @@
     --color-focus: #7aa2ff;
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-md: 0 6px 20px rgb(0 0 0 / 0.5);
+    --color-primary-soft: #1d2945;
+    --color-danger-soft: #3a1f1f;
+    --color-danger-contrast: #0b1020;
+    --color-success-soft: #173326;
+    --color-accent-soft: #3a2d16;
+    --color-overlay: rgb(15 19 28 / 0.85);
+    --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
     --transition-fast: 0ms;
+    --transition-base: 0ms;
   }
 }

@@ -1,0 +1,340 @@
+---
+/**
+ * Gabarit commun aux 4 pages : en-tête, navigation (barre d'onglets en bas sur mobile,
+ * menu en haut sur grand écran), contenu et pied de page légal.
+ * Doc : https://docs.astro.build/fr/basics/layouts/
+ */
+import '@/styles/global.css'
+import NavIcon, { type IconName } from '@/components/layout/NavIcon.astro'
+import { routes } from '@/lib/routes'
+
+export type PageId = 'search' | 'scan' | 'collection' | 'about'
+
+interface Props {
+  /** Titre de la page, affiché dans l'onglet avant « · Card Manager ». */
+  title: string
+  current: PageId
+  description?: string
+}
+
+const {
+  title,
+  current,
+  description = 'Gérer sa collection de cartes chez soi, hors ligne. Projet libre et non officiel.',
+} = Astro.props
+
+const base = import.meta.env.BASE_URL.endsWith('/')
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`
+
+const tabs: { id: PageId; label: string; href: string; icon: IconName }[] = [
+  { id: 'search', label: 'Recherche', href: routes.search(), icon: 'search' },
+  { id: 'scan', label: 'Scanner', href: routes.scan(), icon: 'scan' },
+  { id: 'collection', label: 'Collection', href: routes.collection(), icon: 'collection' },
+  { id: 'about', label: 'À propos', href: routes.about(), icon: 'about' },
+]
+---
+
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover : le contenu peut aller sous l'encoche ; les marges « safe-area »
+         du CSS le gardent lisible. Doc : https://developer.mozilla.org/fr/docs/Web/CSS/env -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{`${title} · Card Manager`}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171d29" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Card Manager" />
+    <link rel="icon" href={`${base}favicon.ico`} sizes="48x48" />
+    <link rel="icon" href={`${base}icons/icon.svg`} type="image/svg+xml" />
+    <link rel="apple-touch-icon" href={`${base}icons/apple-touch-icon.png`} />
+    <!-- Manifeste généré par @vite-pwa/astro au build (absent en développement). -->
+    <link rel="manifest" href={`${base}manifest.webmanifest`} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">
+      Aller au contenu
+    </a>
+
+    <header class="app-header">
+      <div class="app-header__inner">
+        <a class="brand" href={routes.search()}>
+          <span class="brand__mark">
+            <NavIcon name="logo" size={22} />
+          </span>
+          <span class="brand__name">Card Manager</span>
+        </a>
+
+        <nav class="tabbar" aria-label="Navigation principale">
+          <ul class="tabbar__list">
+            {tabs.map((tab) => (
+              <li>
+                <a
+                  class="tabbar__link"
+                  href={tab.href}
+                  aria-current={tab.id === current ? 'page' : undefined}
+                >
+                  <NavIcon name={tab.icon} />
+                  <span class="tabbar__label">{tab.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="app-main" tabindex="-1">
+      <slot />
+    </main>
+
+    <footer class="app-footer">
+      <p>Projet libre et non officiel, non affilié à Konami.</p>
+      <p>
+        Données de cartes&nbsp;:{' '}
+        <a href="https://ygoprodeck.com/api-guide/" rel="noopener" target="_blank">
+          YGOPRODeck
+        </a>
+      </p>
+    </footer>
+
+    <script>
+      // Script traité par Astro : regroupé dans un fichier .js externe, autorisé par la CSP.
+      // Doc : https://docs.astro.build/fr/guides/client-side-scripts/
+      import { registerSW } from 'virtual:pwa-register'
+      import { requestPersistence } from '@/services/storagePersistence'
+
+      // Mise à jour automatique : le nouveau service worker remplace l'ancien dès qu'il est prêt.
+      registerSW({ immediate: true })
+
+      // La collection n'existe que sur cet appareil : on demande au navigateur de ne pas l'effacer.
+      void requestPersistence()
+    </script>
+  </body>
+</html>
+
+<style>
+  .skip-link {
+    position: fixed;
+    top: var(--space-2);
+    left: var(--space-2);
+    z-index: 100;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-primary);
+    color: var(--color-primary-contrast);
+    font-weight: 700;
+    transform: translateY(-200%);
+    transition: transform var(--transition-fast);
+  }
+
+  .skip-link:focus {
+    transform: none;
+  }
+
+  /* ---------- En-tête ---------- */
+  .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding-top: env(safe-area-inset-top);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-overlay);
+    view-transition-name: app-header;
+  }
+
+  /* Flou d'arrière-plan sur un pseudo-élément : sur l'en-tête lui-même, il casserait le
+     positionnement « fixed » de la barre d'onglets mobile. */
+  .app-header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    backdrop-filter: saturate(1.6) blur(12px);
+  }
+
+  .app-header__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    max-width: var(--content-max);
+    min-height: var(--header-height);
+    margin-inline: auto;
+    padding-inline: max(var(--space-4), env(safe-area-inset-left))
+      max(var(--space-4), env(safe-area-inset-right));
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--tap-target);
+    color: var(--color-text);
+    font-weight: 750;
+    font-size: 1.0625rem;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+  }
+
+  .brand__mark {
+    display: grid;
+    place-items: center;
+    width: 2.125rem;
+    height: 2.125rem;
+    border-radius: var(--radius-md);
+    background: var(--color-primary);
+    color: var(--color-primary-contrast);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ---------- Navigation : barre d'onglets en bas (mobile) ---------- */
+  .tabbar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 30;
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+    box-shadow: 0 -4px 16px rgb(0 0 0 / 0.06);
+    view-transition-name: app-tabbar;
+  }
+
+  .tabbar__list {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 32rem;
+    margin-inline: auto;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tabbar__link {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.125rem;
+    min-height: var(--tabbar-height);
+    padding: var(--space-1);
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color var(--transition-fast);
+  }
+
+  .tabbar__link :global(.icon) {
+    padding: 0.125rem 0.875rem;
+    box-sizing: content-box;
+    border-radius: var(--radius-pill);
+    transition: background-color var(--transition-base);
+  }
+
+  .tabbar__link:hover {
+    color: var(--color-text);
+  }
+
+  .tabbar__link[aria-current='page'] {
+    color: var(--color-primary);
+  }
+
+  .tabbar__link[aria-current='page'] :global(.icon) {
+    background: var(--color-primary-soft);
+  }
+
+  .tabbar__link:focus-visible {
+    outline-offset: -4px;
+    border-radius: var(--radius-md);
+  }
+
+  /* ---------- Navigation : menu dans l'en-tête (grand écran) ---------- */
+  @media (min-width: 48rem) {
+    .tabbar {
+      position: static;
+      padding: 0;
+      border: 0;
+      background: none;
+      box-shadow: none;
+      view-transition-name: none;
+    }
+
+    .tabbar__list {
+      display: flex;
+      gap: var(--space-1);
+      max-width: none;
+    }
+
+    .tabbar__link {
+      flex-direction: row;
+      gap: var(--space-2);
+      min-height: var(--tap-target);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-pill);
+      font-size: var(--text-sm);
+    }
+
+    .tabbar__link :global(.icon) {
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      background: none !important;
+    }
+
+    .tabbar__link:hover {
+      background: var(--color-surface-2);
+    }
+
+    .tabbar__link[aria-current='page'] {
+      background: var(--color-primary-soft);
+    }
+  }
+
+  /* ---------- Contenu ---------- */
+  /* Colonne pleine hauteur : le pied de page reste en bas même sur une page courte. */
+  :global(body) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-main {
+    flex: 1 0 auto;
+    width: 100%;
+    max-width: var(--content-max);
+    margin-inline: auto;
+    padding: var(--space-5) max(var(--space-4), env(safe-area-inset-right)) var(--space-6)
+      max(var(--space-4), env(safe-area-inset-left));
+    outline: none;
+  }
+
+  @media (min-width: 48rem) {
+    .app-main {
+      padding-top: var(--space-6);
+    }
+  }
+
+  .app-footer {
+    max-width: var(--content-max);
+    margin-inline: auto;
+    /* Sur mobile, le pied de page reste au-dessus de la barre d'onglets. */
+    padding: var(--space-4) var(--space-4)
+      calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-4));
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    text-align: center;
+  }
+
+  @media (min-width: 48rem) {
+    .app-footer {
+      padding-bottom: var(--space-5);
+    }
+  }
+</style>

@@ -1,0 +1,17 @@
+---
+import AppLayout from '@/layouts/AppLayout.astro'
+import PageLoading from '@/components/layout/PageLoading.astro'
+import SearchPage from '@/components/pages/SearchPage.vue'
+---
+
+<AppLayout
+  title="Recherche"
+  current="search"
+  description="Chercher une carte par nom, texte, type, attribut, code d’impression…"
+>
+  <!-- client:only : composant rendu seulement dans le navigateur (IndexedDB, caméra…).
+       Doc : https://docs.astro.build/fr/reference/directives-reference/#clientonly -->
+  <SearchPage client:only="vue">
+    <PageLoading slot="fallback" title="Recherche" />
+  </SearchPage>
+</AppLayout>

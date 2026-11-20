@@ -18,10 +18,17 @@ const emit = defineEmits<{ reset: [] }>()
 
 <template>
   <!-- role="search" signale une zone de recherche aux lecteurs d'écran. -->
-  <form class="filters" role="search" aria-label="Filtrer la collection" @submit.prevent>
-    <div class="field">
+  <form class="filters surface" role="search" aria-label="Filtrer la collection" @submit.prevent>
+    <div class="field filters__text">
       <label for="filter-text">Nom ou code</label>
-      <input id="filter-text" v-model="text" type="search" autocomplete="off" />
+      <input
+        id="filter-text"
+        v-model="text"
+        type="search"
+        autocomplete="off"
+        enterkeyhint="search"
+        placeholder="ex. dragon, ABC-FR001"
+      />
     </div>
     <div class="field">
       <label for="filter-location">Emplacement</label>
@@ -54,23 +61,38 @@ const emit = defineEmits<{ reset: [] }>()
         <option value="desc">Décroissant</option>
       </select>
     </div>
-    <button type="button" @click="emit('reset')">Réinitialiser les filtres</button>
+    <button type="button" class="btn--ghost filters__reset" @click="emit('reset')">
+      Réinitialiser les filtres
+    </button>
   </form>
 </template>
 
 <style scoped>
 .filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: 0.5rem 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
   align-items: end;
 }
-.field {
-  display: flex;
-  flex-direction: column;
+
+.filters__text,
+.filters__reset {
+  grid-column: 1 / -1;
 }
-.field input,
-.field select {
-  min-width: 0;
+
+@media (min-width: 48rem) {
+  .filters {
+    grid-template-columns: 2fr repeat(4, minmax(0, 1fr));
+  }
+
+  .filters__text {
+    grid-column: auto;
+  }
+
+  .filters__reset {
+    grid-column: 1 / -1;
+    justify-self: end;
+    margin-top: calc(-1 * var(--space-2));
+  }
 }
 </style>

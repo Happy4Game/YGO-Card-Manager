@@ -1,0 +1,17 @@
+---
+import AppLayout from '@/layouts/AppLayout.astro'
+import PageLoading from '@/components/layout/PageLoading.astro'
+import AboutPage from '@/components/pages/AboutPage.vue'
+---
+
+<AppLayout
+  title="À propos"
+  current="about"
+  description="Réglages, stockage local et mentions légales de Card Manager."
+>
+  <!-- client:only : composant rendu seulement dans le navigateur (IndexedDB, caméra…).
+       Doc : https://docs.astro.build/fr/reference/directives-reference/#clientonly -->
+  <AboutPage client:only="vue">
+    <PageLoading slot="fallback" title="À propos" />
+  </AboutPage>
+</AppLayout>

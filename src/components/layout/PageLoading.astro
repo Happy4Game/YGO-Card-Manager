@@ -1,0 +1,69 @@
+---
+/**
+ * Contenu affiché pendant le chargement d'une île `client:only` (slot « fallback »).
+ * Doc : https://docs.astro.build/fr/reference/directives-reference/#clientonly
+ */
+interface Props {
+  title: string
+}
+
+const { title } = Astro.props
+---
+
+<div class="page-loading">
+  <h1>{title}</h1>
+  <p class="muted" role="status">
+    Chargement…
+  </p>
+  <div class="skeleton" aria-hidden="true">
+    <span></span>
+    <span></span>
+    <span></span>
+  </div>
+</div>
+
+<style>
+  .page-loading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-2);
+  }
+
+  .skeleton span {
+    display: block;
+    height: 4.5rem;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(
+      90deg,
+      var(--color-surface-2) 0%,
+      var(--color-surface) 50%,
+      var(--color-surface-2) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+
+  .skeleton span:nth-child(2) {
+    width: 85%;
+  }
+
+  .skeleton span:nth-child(3) {
+    width: 70%;
+  }
+
+  @keyframes shimmer {
+    from {
+      background-position: 100% 0;
+    }
+
+    to {
+      background-position: -100% 0;
+    }
+  }
+</style>

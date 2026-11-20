@@ -8,14 +8,28 @@ test.beforeEach(async ({ page }) => {
 // Aucun appel réseau : la carte 12345678 (fictive) n'est pas dans le cache local.
 
 test('affiche un état vide expliquant comment ajouter des cartes', async ({ page }) => {
-  await page.goto('/#/collection')
+  await page.goto('/collection/')
   await expect(page.getByRole('heading', { name: 'Ma collection', level: 1 })).toBeVisible()
   await expect(page.getByText('Ta collection est vide.')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Recherche' }).last()).toBeVisible()
+  const main = page.getByRole('main')
+  await expect(main.getByRole('link', { name: 'Recherche' })).toHaveAttribute('href', '/')
+  await expect(main.getByRole('link', { name: 'scanne-la' })).toHaveAttribute('href', '/scan/')
+})
+
+test("pré-remplit le code d'impression depuis ?set= puis nettoie l'URL", async ({ page }) => {
+  await page.goto('/collection/?add=12345678&set=tst-fr002')
+
+  const form = page.getByRole('form', { name: 'Ajouter une carte' })
+  await expect(form.getByLabel('Identifiant de la carte (passcode)')).toHaveValue('12345678')
+  await expect(form.getByLabel("Code d'impression")).toHaveValue('TST-FR002')
+
+  await form.getByRole('button', { name: 'Annuler' }).click()
+  await expect(form).toBeHidden()
+  await expect(page).toHaveURL(/\/collection\/$/)
 })
 
 test('ajoute, incrémente puis supprime une entrée', async ({ page }) => {
-  await page.goto('/#/collection?add=12345678')
+  await page.goto('/collection/?add=12345678')
 
   const form = page.getByRole('form', { name: 'Ajouter une carte' })
   await expect(form).toBeVisible()

@@ -1,0 +1,17 @@
+---
+import AppLayout from '@/layouts/AppLayout.astro'
+import PageLoading from '@/components/layout/PageLoading.astro'
+import ScanPage from '@/components/pages/ScanPage.vue'
+---
+
+<AppLayout
+  title="Scanner"
+  current="scan"
+  description="Scanner une carte avec l’appareil photo pour la retrouver et l’ajouter à sa collection."
+>
+  <!-- client:only : composant rendu seulement dans le navigateur (IndexedDB, caméra…).
+       Doc : https://docs.astro.build/fr/reference/directives-reference/#clientonly -->
+  <ScanPage client:only="vue">
+    <PageLoading slot="fallback" title="Scanner" />
+  </ScanPage>
+</AppLayout>

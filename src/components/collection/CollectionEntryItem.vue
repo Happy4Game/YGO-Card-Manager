@@ -46,36 +46,65 @@ function decrement() {
 
 <template>
   <li class="entry">
-    <article :aria-labelledby="titleId">
-      <CardImage v-if="item.cardKnown" :card-id="item.cardId" class="thumb" />
-      <h3 :id="titleId" class="name">{{ item.cardName }}</h3>
-      <p class="details">
-        <span>{{ item.setCode || 'Code inconnu' }}</span>
-        <span v-if="item.rarity">{{ item.rarity }}</span>
-        <span>{{ languageLabel(item.language) }}</span>
-        <span>{{ CONDITION_LABELS[item.condition] }}</span>
-        <span>{{ locationLabel(item.location) }}</span>
-      </p>
-      <p v-if="item.note" class="note">{{ item.note }}</p>
+    <article class="entry__card" :aria-labelledby="titleId">
+      <CardImage v-if="item.cardKnown" :card-id="item.cardId" class="entry__thumb" />
+      <div class="entry__body">
+        <h3 :id="titleId" class="entry__name">{{ item.cardName }}</h3>
+        <p class="entry__details">
+          <span class="badge">{{ item.setCode || 'Code inconnu' }}</span>
+          <span v-if="item.rarity" class="badge badge--accent">{{ item.rarity }}</span>
+          <span class="chip">{{ languageLabel(item.language) }}</span>
+          <span class="chip">{{ CONDITION_LABELS[item.condition] }}</span>
+          <span class="chip">{{ locationLabel(item.location) }}</span>
+        </p>
+        <p v-if="item.note" class="entry__note">{{ item.note }}</p>
+      </div>
 
-      <div class="quantity">
-        <button
-          type="button"
-          class="icon"
-          :aria-label="`Retirer un exemplaire de ${item.cardName}`"
-          @click="decrement"
-        >
-          −
-        </button>
-        <span>Quantité : {{ item.quantity }}</span>
-        <button
-          type="button"
-          class="icon"
-          :aria-label="`Ajouter un exemplaire de ${item.cardName}`"
-          @click="emit('increment', item)"
-        >
-          +
-        </button>
+      <div class="entry__footer">
+        <div class="stepper">
+          <button
+            type="button"
+            class="btn--icon btn--ghost"
+            :aria-label="`Retirer un exemplaire de ${item.cardName}`"
+            @click="decrement"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path d="M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+            </svg>
+          </button>
+          <span class="stepper__value"
+            ><span class="visually-hidden">Quantité : </span>{{ item.quantity }}</span
+          >
+          <button
+            type="button"
+            class="btn--icon btn--ghost"
+            :aria-label="`Ajouter un exemplaire de ${item.cardName}`"
+            @click="emit('increment', item)"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                d="M12 5v14M5 12h14"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div v-if="!confirming" class="entry__actions">
+          <button type="button" class="btn--ghost btn--sm" @click="emit('edit', item)">
+            Modifier<span class="visually-hidden"> {{ item.cardName }}</span>
+          </button>
+          <button
+            ref="deleteButton"
+            type="button"
+            class="btn--ghost btn--sm entry__delete"
+            @click="askDelete"
+          >
+            Supprimer<span class="visually-hidden"> {{ item.cardName }}</span>
+          </button>
+        </div>
       </div>
 
       <div
@@ -86,80 +115,165 @@ function decrement() {
         @keydown.escape="cancelDelete"
       >
         <p :id="confirmTextId">Supprimer « {{ item.cardName }} » de la collection ?</p>
-        <button type="button" class="danger" @click="emit('remove', item)">Oui, supprimer</button>
-        <button ref="cancelButton" type="button" @click="cancelDelete">Annuler</button>
-      </div>
-      <div v-else class="actions">
-        <button type="button" @click="emit('edit', item)">
-          Modifier<span class="visually-hidden"> {{ item.cardName }}</span>
-        </button>
-        <button ref="deleteButton" type="button" @click="askDelete">
-          Supprimer<span class="visually-hidden"> {{ item.cardName }}</span>
-        </button>
+        <div class="confirm__actions">
+          <button type="button" class="btn--danger" @click="emit('remove', item)">
+            Oui, supprimer
+          </button>
+          <button ref="cancelButton" type="button" class="btn--secondary" @click="cancelDelete">
+            Annuler
+          </button>
+        </div>
       </div>
     </article>
   </li>
 </template>
 
 <style scoped>
-.thumb {
-  float: right;
-  margin: 0 0 0.5rem 0.75rem;
-}
 .entry {
   list-style: none;
-  border: 1px solid currentColor;
-  border-radius: 0.5rem;
-  padding: 0.75rem;
+  min-width: 0;
 }
-.name {
-  margin: 0;
-  font-size: 1.1rem;
+
+.entry__card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'thumb body'
+    'footer footer'
+    'confirm confirm';
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition:
+    box-shadow var(--transition-base),
+    border-color var(--transition-base);
+}
+
+.entry__card:hover,
+.entry__card:focus-within {
+  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+  box-shadow: var(--shadow-md);
+}
+
+/* Sans miniature (carte inconnue ou images désactivées), le texte prend toute la largeur. */
+.entry__card:not(:has(.entry__thumb)) .entry__body {
+  grid-column: 1 / -1;
+}
+
+.entry__thumb {
+  grid-area: thumb;
+  width: 4rem;
+  height: auto;
+  aspect-ratio: 84 / 123;
+  object-fit: cover;
+  box-shadow: var(--shadow-sm);
+}
+
+.entry__body {
+  grid-area: body;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.entry__name {
   overflow-wrap: anywhere;
 }
-.details {
+
+.entry__details {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
-  margin: 0.25rem 0;
-  font-size: 0.9rem;
+  gap: var(--space-1);
 }
-.note {
-  margin: 0.25rem 0;
+
+.entry__details .chip {
+  white-space: normal;
+}
+
+.entry__note {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
   font-style: italic;
   overflow-wrap: anywhere;
 }
-.quantity,
-.actions,
-.confirm {
+
+.entry__footer {
+  grid-area: footer;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
 }
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+}
+
+.stepper button {
+  border-radius: var(--radius-pill);
+}
+
+.stepper__value {
+  min-width: 2.5rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* Signe décoratif : le texte alternatif vide (« / '' ») le cache aux lecteurs d'écran. */
+.stepper__value::before {
+  content: '×';
+  content: '×' / '';
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.entry__actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.entry__delete {
+  color: var(--color-danger);
+}
+
+.entry__delete:hover {
+  background: var(--color-danger-soft);
+}
+
+.confirm {
+  grid-area: confirm;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+}
+
 .confirm p {
-  flex-basis: 100%;
-  margin: 0;
+  font-weight: 600;
 }
-/* Cible tactile d'au moins 44 px (WCAG 2.5.5). */
-button {
-  min-height: 2.75rem;
+
+.confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
-.icon {
-  min-width: 2.75rem;
-  font-size: 1.25rem;
-}
-.danger {
-  font-weight: bold;
-}
-/* Masque visuellement un texte tout en le laissant aux lecteurs d'écran. */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+
+.confirm__actions button {
+  flex: 1 1 8rem;
 }
 </style>
