@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import CollectionEntryForm from '@/components/collection/CollectionEntryForm.vue'
 import CollectionEntryItem from '@/components/collection/CollectionEntryItem.vue'
@@ -13,11 +13,28 @@ import {
   type NewCollectionEntry,
 } from '@/services/collection'
 import { useCollectionStore } from '@/stores/collection'
+import { usePricesStore } from '@/stores/prices'
+import { useSettingsStore } from '@/stores/settings'
 
 const store = useCollectionStore()
 // `storeToRefs` garde la réactivité lors de la déstructuration.
 // Doc : https://pinia.vuejs.org/core-concepts/#Destructuring-from-a-Store
 const { items, stats, locations, loading, error, filters, sort } = storeToRefs(store)
+
+// Prix : derniers relevés pour les cartes affichées, mise à jour au plus une fois par jour.
+const prices = usePricesStore()
+const settings = useSettingsStore()
+const ownedIds = computed(() => [...new Set(items.value.map((item) => item.cardId))])
+let pricesRequested = false
+watch(ownedIds, (ids) => {
+  if (ids.length === 0) return
+  if (!pricesRequested && settings.autoPrices) {
+    pricesRequested = true
+    void prices.refresh(ids)
+  } else {
+    void prices.loadLatest(ids)
+  }
+})
 
 /** Formulaire ouvert : ajout (carte et impression éventuellement pré-remplies) ou modification. */
 type FormState =
@@ -255,6 +272,7 @@ async function remove(item: CollectionItem) {
               v-for="item in items"
               :key="item.id"
               :item="item"
+              :price="prices.latest.get(item.cardId)"
               @increment="changeQuantity($event, 1)"
               @decrement="changeQuantity($event, -1)"
               @edit="openForm({ mode: 'edit', entry: $event })"

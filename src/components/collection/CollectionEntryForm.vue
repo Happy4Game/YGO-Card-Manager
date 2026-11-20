@@ -9,6 +9,14 @@ import {
   type NewCollectionEntry,
 } from '@/services/collection'
 import { CONDITION_LABELS } from './labels'
+import { db } from '@/db/database'
+import { listRarities } from '@/services/rarities'
+
+/** Raretés connues (déduites des cartes téléchargées), proposées dans la liste du champ. */
+const rarities = ref<string[]>([])
+onMounted(async () => {
+  rarities.value = await listRarities(db)
+})
 
 const props = defineProps<{
   /** Entrée à modifier ; absente pour un ajout. */
@@ -177,7 +185,16 @@ onMounted(() => heading.value?.focus())
       </div>
       <div class="field">
         <label :for="fieldId('rarity')">Rareté</label>
-        <input :id="fieldId('rarity')" v-model="draft.rarity" type="text" autocomplete="off" />
+        <input
+          :id="fieldId('rarity')"
+          v-model="draft.rarity"
+          type="text"
+          autocomplete="off"
+          :list="fieldId('rarities')"
+        />
+        <datalist :id="fieldId('rarities')">
+          <option v-for="rarity in rarities" :key="rarity" :value="rarity" />
+        </datalist>
       </div>
     </template>
 

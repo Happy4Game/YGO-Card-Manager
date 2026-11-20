@@ -2,9 +2,11 @@
 import { nextTick, ref, useTemplateRef } from 'vue'
 import type { CollectionItem } from '@/services/collection'
 import CardImage from '@/components/common/CardImage.vue'
+import PriceTag from '@/components/prices/PriceTag.vue'
+import type { PricePoint } from '@/domain/price'
 import { CONDITION_LABELS, languageLabel, locationLabel } from './labels'
 
-const props = defineProps<{ item: CollectionItem }>()
+const props = defineProps<{ item: CollectionItem; price?: PricePoint }>()
 const emit = defineEmits<{
   increment: [item: CollectionItem]
   decrement: [item: CollectionItem]
@@ -58,6 +60,12 @@ function decrement() {
           <span class="chip">{{ locationLabel(item.location) }}</span>
         </p>
         <p v-if="item.note" class="entry__note">{{ item.note }}</p>
+        <PriceTag
+          v-if="item.cardKnown"
+          :card-id="item.cardId"
+          :card-name="item.cardName"
+          :price="price"
+        />
       </div>
 
       <div class="entry__footer">

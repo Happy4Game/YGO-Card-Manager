@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 
 const SHOW_IMAGES_KEY = 'settings:showImages'
+const AUTO_PRICES_KEY = 'settings:autoPrices'
 
 /** localStorage peut être indisponible (navigation privée, stockage bloqué) : on l'entoure de try/catch. */
 function readBoolean(key: string, fallback: boolean): boolean {
@@ -25,5 +26,8 @@ function writeBoolean(key: string, value: boolean): void {
 export const useSettingsStore = defineStore('settings', () => {
   const showImages = ref(readBoolean(SHOW_IMAGES_KEY, true))
   watch(showImages, (value) => writeBoolean(SHOW_IMAGES_KEY, value))
-  return { showImages }
+  /** Mise à jour quotidienne des prix des cartes de la collection (une petite requête). */
+  const autoPrices = ref(readBoolean(AUTO_PRICES_KEY, true))
+  watch(autoPrices, (value) => writeBoolean(AUTO_PRICES_KEY, value))
+  return { showImages, autoPrices }
 })

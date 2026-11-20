@@ -150,3 +150,32 @@ describe('fetchAllCards', () => {
     )
   })
 })
+
+describe('prix', () => {
+  it('convertit le prix Cardmarket en nombre', async () => {
+    const { toCardPrices } = await import('../ygoprodeck')
+    expect(toCardPrices({ id: 1, card_prices: [{ cardmarket_price: '0.42' }] })).toEqual({
+      cardId: 1,
+      cardmarket: 0.42,
+    })
+    expect(toCardPrices({ id: 2, card_prices: [{ cardmarket_price: '0.00' }] })).toEqual({
+      cardId: 2,
+      cardmarket: null,
+    })
+  })
+
+  it('regroupe les identifiants par paquets de 50', async () => {
+    const { fetchCardPrices } = await import('../ygoprodeck')
+    const urls: string[] = []
+    const fetchFn = async (url: string) => {
+      urls.push(url)
+      return new Response(JSON.stringify({ data: [] }), { status: 200 })
+    }
+    await fetchCardPrices(
+      Array.from({ length: 120 }, (_, i) => i + 1),
+      fetchFn,
+    )
+    expect(urls).toHaveLength(3)
+    expect(urls[0]).toContain('cardinfo.php?id=1,2,3')
+  })
+})

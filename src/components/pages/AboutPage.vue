@@ -9,7 +9,7 @@ import {
   type StorageUsage,
 } from '@/services/storagePersistence'
 
-const { showImages } = storeToRefs(useSettingsStore())
+const { showImages, autoPrices } = storeToRefs(useSettingsStore())
 const persistence = ref<PersistenceState | null>(null)
 const usage = ref<StorageUsage | null>(null)
 const cacheMessage = ref('')
@@ -70,6 +70,16 @@ onMounted(refreshStorage)
         <p class="hint">
           Chaque image est téléchargée une seule fois depuis YGOPRODeck puis gardée sur cet
           appareil. Décoche pour ne rien télécharger.
+        </p>
+      </div>
+      <div>
+        <label class="check" for="auto-prices">
+          <input id="auto-prices" v-model="autoPrices" type="checkbox" />
+          Mettre à jour les prix de ma collection chaque jour
+        </label>
+        <p class="hint">
+          Une petite requête par jour vers YGOPRODeck, seulement pour les cartes que tu possèdes.
+          Les prix relevés forment l'historique affiché sur chaque carte.
         </p>
       </div>
       <div class="cluster">
