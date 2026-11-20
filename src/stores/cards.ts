@@ -39,6 +39,8 @@ export const useCardsStore = defineStore('cards', () => {
   const lastResult = ref<CardSyncResult | null>(null)
   const errorMessage = ref<string | null>(null)
   const cardCount = ref(0)
+  /** Augmente à chaque fois que le contenu de la table `cards` change (caches à invalider). */
+  const revision = ref(0)
 
   async function refreshCount(): Promise<void> {
     cardCount.value = await db.cards.count()
@@ -56,6 +58,7 @@ export const useCardsStore = defineStore('cards', () => {
       )
       lastResult.value = result
       cardCount.value = result.count
+      if (result.status === 'updated') revision.value += 1
       status.value = 'done'
     } catch (error) {
       errorMessage.value = toFrenchErrorMessage(error)
@@ -63,5 +66,5 @@ export const useCardsStore = defineStore('cards', () => {
     }
   }
 
-  return { status, lastResult, errorMessage, cardCount, refreshCount, sync }
+  return { status, lastResult, errorMessage, cardCount, revision, refreshCount, sync }
 })

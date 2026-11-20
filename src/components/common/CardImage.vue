@@ -36,7 +36,7 @@ const src = computed(
 <style scoped>
 .card-image {
   flex: none;
-  border-radius: 0.25rem;
-  background: #ddd;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
 }
 </style>

@@ -34,7 +34,8 @@ export default defineConfig({
     /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
     actionTimeout: 0,
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
+    // Astro sert le dev et la préversion sur le port 4321.
+    baseURL: 'http://localhost:4321',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -103,8 +104,10 @@ export default defineConfig({
      * Use the preview server on CI for more realistic testing.
      * Playwright will re-use the local server if there is already a dev-server running.
      */
-    command: process.env.CI ? 'npm run preview' : 'npm run dev',
-    port: process.env.CI ? 4173 : 5173,
+    // --ignore-lock : serveur au premier plan, même quand Astro détecte un agent IA (sinon il
+    // passe en arrière-plan et Playwright croit qu'il s'est arrêté).
+    command: process.env.CI ? 'npm run preview -- --ignore-lock' : 'npm run dev -- --ignore-lock',
+    port: 4321,
     reuseExistingServer: !process.env.CI,
   },
 })

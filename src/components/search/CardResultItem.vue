@@ -1,97 +1,215 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
-import type { CardData } from '@/domain/card'
 import CardImage from '@/components/common/CardImage.vue'
+import QuickAddButton from '@/components/common/QuickAddButton.vue'
+import type { SearchHit } from '@/services/search/searchEngine'
+import {
+  attributeLabel,
+  frenchTypeLabel,
+  markerLabel,
+  raceLabel,
+} from '@/services/search/vocabulary'
 
-const props = defineProps<{ card: CardData }>()
+const props = defineProps<{ hit: SearchHit }>()
+
+const card = computed(() => props.hit.card)
 
 /** Caractéristiques affichées seulement quand elles existent (monstres). */
 const stats = computed(() => {
-  const { card } = props
+  const c = card.value
   const list: { label: string; value: string }[] = []
-  if (card.level !== undefined) {
-    list.push({ label: card.type.includes('XYZ') ? 'Rang' : 'Niveau', value: String(card.level) })
+  if (c.level !== undefined) {
+    list.push({ label: c.type.includes('XYZ') ? 'Rang' : 'Niveau', value: String(c.level) })
   }
-  if (card.linkval !== undefined) list.push({ label: 'LINK', value: String(card.linkval) })
-  if (card.scale !== undefined) list.push({ label: 'Échelle', value: String(card.scale) })
-  if (card.atk !== undefined) list.push({ label: 'ATK', value: String(card.atk) })
-  if (card.def !== undefined) list.push({ label: 'DEF', value: String(card.def) })
+  if (c.linkval !== undefined) list.push({ label: 'Lien', value: String(c.linkval) })
+  if (c.scale !== undefined) list.push({ label: 'Échelle', value: String(c.scale) })
+  if (c.atk !== undefined) list.push({ label: 'ATK', value: String(c.atk) })
+  if (c.def !== undefined) list.push({ label: 'DEF', value: String(c.def) })
   return list
 })
 
-const subtitle = computed(() =>
-  [props.card.type, props.card.race, props.card.attribute].filter(Boolean).join(' · '),
+const typeText = computed(() => card.value.typeLabel ?? frenchTypeLabel(card.value.type))
+const details = computed(() =>
+  [card.value.attribute ? attributeLabel(card.value.attribute) : '', raceLabel(card.value.race)]
+    .filter(Boolean)
+    .join(' · '),
 )
+const markers = computed(() => (card.value.linkmarkers ?? []).map(markerLabel).join(', '))
+const headingId = computed(() => `card-${card.value.id}-name`)
 </script>
 
 <template>
-  <article class="card" :aria-labelledby="`card-${card.id}-name`">
+  <article class="card" :aria-labelledby="headingId" tabindex="-1">
     <CardImage :card-id="card.id" class="thumb" />
-    <h3 :id="`card-${card.id}-name`">{{ card.name }}</h3>
-    <p class="subtitle">{{ subtitle }}</p>
-    <dl v-if="stats.length > 0" class="stats">
-      <div v-for="stat in stats" :key="stat.label">
-        <dt>{{ stat.label }}</dt>
-        <dd>{{ stat.value }}</dd>
-      </div>
-    </dl>
-    <!-- <details> se replie et se déplie au clavier sans JavaScript.
-         Doc MDN : https://developer.mozilla.org/fr/docs/Web/HTML/Element/details -->
-    <details v-if="card.desc">
-      <summary>Texte de la carte</summary>
-      <!-- Interpolation {{ }} : Vue échappe le HTML, jamais de v-html sur un texte de l'API. -->
-      <p class="desc">{{ card.desc }}</p>
-    </details>
-    <RouterLink class="add" :to="{ name: 'collection', query: { add: String(card.id) } }">
-      Ajouter à ma collection<span class="visually-hidden"> : {{ card.name }}</span>
-    </RouterLink>
+    <div class="body">
+      <header class="head">
+        <h3 :id="headingId" class="name">{{ card.name }}</h3>
+        <p v-if="card.nameEn" class="name-en" :class="{ matched: hit.matchedEnglish }">
+          <span class="visually-hidden">Nom anglais : </span
+          ><span lang="en">{{ card.nameEn }}</span>
+        </p>
+      </header>
+      <p class="type">
+        {{ typeText }}<template v-if="details"> · {{ details }}</template>
+      </p>
+      <dl v-if="stats.length > 0" class="stats">
+        <div v-for="stat in stats" :key="stat.label" class="stat">
+          <dt>{{ stat.label }}</dt>
+          <dd>{{ stat.value }}</dd>
+        </div>
+      </dl>
+      <p v-if="markers" class="markers">Flèches : {{ markers }}</p>
+      <p class="meta">
+        <span class="passcode">#{{ card.id }}</span>
+        <span v-if="hit.matchedSetCode" class="set-code">{{ hit.matchedSetCode }}</span>
+        <span v-if="hit.ownedQuantity > 0" class="owned">
+          {{ hit.ownedQuantity }} possédée{{ hit.ownedQuantity > 1 ? 's' : '' }}
+        </span>
+      </p>
+      <!-- <details> se replie et se déplie au clavier sans JavaScript.
+           Doc MDN : https://developer.mozilla.org/fr/docs/Web/HTML/Element/details -->
+      <details v-if="card.desc" class="desc-toggle">
+        <summary>Texte de la carte</summary>
+        <!-- Interpolation {{ }} : Vue échappe le HTML, jamais de v-html sur un texte de l'API. -->
+        <p class="desc">{{ card.desc }}</p>
+      </details>
+    </div>
+    <QuickAddButton
+      class="add"
+      :card="card"
+      :set-code="hit.matchedSetCode"
+      :owned="hit.ownedQuantity"
+    />
   </article>
 </template>
 
 <style scoped>
-.thumb {
-  float: right;
-  margin: 0 0 0.5rem 0.75rem;
-}
 .card {
-  overflow: hidden;
-  border: 1px solid #888;
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'thumb body'
+    'add add';
+  gap: var(--space-2) var(--space-3);
+  box-sizing: border-box;
+  height: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition:
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
 }
-h3 {
+.card:hover {
+  border-color: var(--color-primary);
+}
+.card:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.thumb {
+  grid-area: thumb;
+  width: 4rem;
+  height: auto;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+.body {
+  grid-area: body;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.head {
+  min-width: 0;
+}
+.name {
   margin: 0;
+  font-size: var(--text-md);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
-.subtitle {
-  margin: 0.25rem 0;
+.name-en {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+.name-en.matched {
+  color: var(--color-primary);
+}
+.type,
+.markers {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 .stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1rem;
-  margin: 0.25rem 0;
+  gap: var(--space-1);
+  margin: 0;
 }
-.stats div {
+.stat {
   display: flex;
-  gap: 0.25rem;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  font-size: var(--text-sm);
 }
 dt {
-  font-weight: bold;
+  font-weight: 600;
+  color: var(--color-text-muted);
 }
 dd {
   margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.passcode,
+.set-code {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+.owned {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-success);
+  color: var(--color-surface);
+  font-weight: 600;
+}
+.desc-toggle summary {
+  width: fit-content;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-primary);
 }
 .desc {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
   white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 .add {
-  display: inline-block;
-  margin-top: 0.5rem;
+  grid-area: add;
+  justify-self: stretch;
 }
-summary:focus-visible,
-.add:focus-visible {
-  outline: 3px solid currentColor;
+summary:focus-visible {
+  outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
 /* Texte lu par les lecteurs d'écran mais masqué visuellement, pour des liens explicites. */

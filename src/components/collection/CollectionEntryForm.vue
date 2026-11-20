@@ -9,12 +9,24 @@ import {
   type NewCollectionEntry,
 } from '@/services/collection'
 import { CONDITION_LABELS } from './labels'
+import { db } from '@/db/database'
+import { listRarities } from '@/services/rarities'
+import { pickPrint, readDefaults } from '@/services/quickAdd'
+import { setCodeKey } from '@/domain/setCode'
+
+/** Raretés connues (déduites des cartes téléchargées), proposées dans la liste du champ. */
+const rarities = ref<string[]>([])
+onMounted(async () => {
+  rarities.value = await listRarities(db)
+})
 
 const props = defineProps<{
   /** Entrée à modifier ; absente pour un ajout. */
   entry?: CollectionItem
   /** Carte pré-sélectionnée (lien « Ajouter à ma collection » depuis la recherche). */
   initialCardId?: number
+  /** Code d'impression pré-rempli (ex. lu par le scan), utilisé seulement pour un ajout. */
+  initialSetCode?: string
   /** Emplacements existants, proposés en autocomplétion. */
   locations: string[]
   /** Recherche d'une carte dans le cache local. */
@@ -32,16 +44,19 @@ const fieldId = (name: string) => `${uid}-${name}`
 /** Valeur choisie dans la liste des impressions : index dans `card.sets`, ou saisie libre. */
 const FREE_SET = 'free'
 
+/** Pour un ajout : derniers réglages utilisés (langue, état, emplacement). */
+const defaults = props.entry ? undefined : readDefaults()
+
 const draft = reactive({
   // Champ texte : un <input type="number"> vide ne vaut pas un nombre, on convertit à l'envoi.
   cardId: String(props.entry?.cardId ?? props.initialCardId ?? ''),
   setChoice: FREE_SET,
-  setCode: props.entry?.setCode ?? '',
+  setCode: props.entry?.setCode ?? props.initialSetCode ?? '',
   rarity: props.entry?.rarity ?? '',
-  language: props.entry?.language ?? 'fr',
-  condition: props.entry?.condition ?? 'Near Mint',
+  language: props.entry?.language ?? defaults?.language ?? 'fr',
+  condition: props.entry?.condition ?? defaults?.condition ?? 'Near Mint',
   quantity: props.entry?.quantity ?? 1,
-  location: props.entry?.location ?? '',
+  location: props.entry?.location ?? defaults?.location ?? '',
   note: props.entry?.note ?? '',
 })
 
@@ -60,8 +75,18 @@ watch(
     // Ignore une réponse arrivée après une nouvelle saisie.
     if (cardId !== parsedCardId.value) return
     card.value = found
+    // Ajout : impression déduite du code lu, ou la seule impression connue.
+    if (found && !isEdit.value && draft.rarity === '') {
+      const print = pickPrint(found, draft.setCode || undefined)
+      draft.setCode = print.code
+      draft.rarity = print.rarity
+    }
+    // Comparaison sans la région (« LOB-FR001 » = « LOB-EN001 ») : même impression.
+    const key = draft.setCode ? setCodeKey(draft.setCode) : undefined
     const index = found?.sets.findIndex(
-      (set) => set.code === draft.setCode && (draft.rarity === '' || set.rarity === draft.rarity),
+      (set) =>
+        (set.code === draft.setCode || (key !== undefined && setCodeKey(set.code) === key)) &&
+        (draft.rarity === '' || set.rarity === draft.rarity),
     )
     draft.setChoice = index !== undefined && index >= 0 ? String(index) : FREE_SET
   },
@@ -82,7 +107,9 @@ watch(
   (choice) => {
     const set = choice === FREE_SET ? undefined : knownSets.value[Number(choice)]
     if (set) {
-      draft.setCode = set.code
+      // Garde le code saisi ou lu s'il désigne la même impression (seule la région diffère).
+      const sameKey = draft.setCode !== '' && setCodeKey(draft.setCode) === setCodeKey(set.code)
+      if (!sameKey) draft.setCode = set.code
       draft.rarity = set.rarity
     }
   },
@@ -119,12 +146,17 @@ onMounted(() => heading.value?.focus())
 </script>
 
 <template>
-  <form class="entry-form" :aria-labelledby="fieldId('title')" novalidate @submit.prevent="submit">
-    <h2 :id="fieldId('title')" ref="heading" tabindex="-1">
+  <form
+    class="entry-form surface"
+    :aria-labelledby="fieldId('title')"
+    novalidate
+    @submit.prevent="submit"
+  >
+    <h2 :id="fieldId('title')" ref="heading" class="entry-form__title" tabindex="-1">
       {{ isEdit ? 'Modifier une entrée' : 'Ajouter une carte' }}
     </h2>
 
-    <div class="field">
+    <div class="field field--wide">
       <label :for="fieldId('card')">Identifiant de la carte (passcode)</label>
       <input
         :id="fieldId('card')"
@@ -136,10 +168,12 @@ onMounted(() => heading.value?.focus())
         :readonly="isEdit"
         :aria-describedby="fieldId('card-name')"
       />
-      <p :id="fieldId('card-name')" class="hint">{{ cardHint }}</p>
+      <p :id="fieldId('card-name')" class="hint" :class="{ 'hint--found': card }">
+        {{ cardHint }}
+      </p>
     </div>
 
-    <div v-if="knownSets.length > 0" class="field">
+    <div v-if="knownSets.length > 0" class="field field--wide">
       <label :for="fieldId('set-choice')">Impression</label>
       <select :id="fieldId('set-choice')" v-model="draft.setChoice">
         <option
@@ -161,12 +195,23 @@ onMounted(() => heading.value?.focus())
           v-model="draft.setCode"
           type="text"
           autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
           placeholder="ex. ABC-FR001"
         />
       </div>
       <div class="field">
         <label :for="fieldId('rarity')">Rareté</label>
-        <input :id="fieldId('rarity')" v-model="draft.rarity" type="text" autocomplete="off" />
+        <input
+          :id="fieldId('rarity')"
+          v-model="draft.rarity"
+          type="text"
+          autocomplete="off"
+          :list="fieldId('rarities')"
+        />
+        <datalist :id="fieldId('rarities')">
+          <option v-for="rarity in rarities" :key="rarity" :value="rarity" />
+        </datalist>
       </div>
     </template>
 
@@ -198,6 +243,7 @@ onMounted(() => heading.value?.focus())
         :id="fieldId('quantity')"
         v-model.number="draft.quantity"
         type="number"
+        inputmode="numeric"
         min="1"
         step="1"
         required
@@ -221,16 +267,18 @@ onMounted(() => heading.value?.focus())
       </datalist>
     </div>
 
-    <div class="field">
+    <div class="field field--wide">
       <label :for="fieldId('note')">Note</label>
       <textarea :id="fieldId('note')" v-model="draft.note" rows="2" />
     </div>
 
-    <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
+    <p v-if="errorMessage" class="notice notice--danger field--wide" role="alert">
+      {{ errorMessage }}
+    </p>
 
-    <div class="actions">
-      <button type="submit">Enregistrer</button>
-      <button type="button" @click="emit('cancel')">Annuler</button>
+    <div class="actions field--wide">
+      <button type="submit" class="btn--primary">Enregistrer</button>
+      <button type="button" class="btn--ghost" @click="emit('cancel')">Annuler</button>
     </div>
   </form>
 </template>
@@ -238,38 +286,38 @@ onMounted(() => heading.value?.focus())
 <style scoped>
 .entry-form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0.75rem 1rem;
-  border: 1px solid currentColor;
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-  margin-bottom: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-4);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  box-shadow: var(--shadow-md);
 }
-.entry-form h2,
-.entry-form .error,
-.entry-form .actions {
+
+.field--wide {
   grid-column: 1 / -1;
-  margin: 0;
 }
-.field {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+
+.entry-form__title {
+  grid-column: 1 / -1;
 }
+
 .hint {
-  margin: 0.25rem 0 0;
-  font-size: 0.875rem;
   overflow-wrap: anywhere;
 }
-.error {
-  font-weight: bold;
+
+.hint--found {
+  color: var(--color-success);
+  font-weight: 600;
 }
+
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
-button {
-  min-height: 2.75rem;
+
+@media (max-width: 30rem) {
+  .actions button {
+    flex: 1 1 100%;
+  }
 }
 </style>

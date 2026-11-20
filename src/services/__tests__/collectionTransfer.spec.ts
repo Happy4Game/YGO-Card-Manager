@@ -93,6 +93,7 @@ describe('services/collectionTransfer', () => {
         desc: 'Texte de test.',
         race: 'Rock',
         sets: [],
+        setKeys: [],
       })
       await addEntry(db, entry({ location: 'Boîte, étagère', note: 'a\nb' }))
       await addEntry(db, entry({ cardId: 22222222, note: '=1+1' }))

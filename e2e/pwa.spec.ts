@@ -38,4 +38,26 @@ if (process.env.CI) {
     })
     expect(active).toBe(true)
   })
+
+  test('les 4 pages restent accessibles hors ligne (précache du service worker)', async ({
+    page,
+    context,
+  }) => {
+    await page.goto('/')
+    // `ready` attend un service worker actif, donc un précache terminé.
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready
+    })
+    await context.setOffline(true)
+
+    for (const [path, heading] of [
+      ['/collection/?add=12345678&set=TST-FR001', 'Ma collection'],
+      ['/scan/', 'Scanner'],
+      ['/about/', 'À propos'],
+      ['/', 'Recherche'],
+    ] as const) {
+      await page.goto(path)
+      await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
+    }
+  })
 }

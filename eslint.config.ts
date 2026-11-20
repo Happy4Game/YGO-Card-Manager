@@ -1,6 +1,7 @@
 import { globalIgnores } from 'eslint/config'
 import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript'
 import pluginVue from 'eslint-plugin-vue'
+import pluginAstro from 'eslint-plugin-astro'
 import pluginPlaywright from 'eslint-plugin-playwright'
 import pluginVitest from '@vitest/eslint-plugin'
 import pluginOxlint from 'eslint-plugin-oxlint'
@@ -17,14 +18,30 @@ export default defineConfigWithVueTs(
     files: ['**/*.{vue,ts,mts,tsx}'],
   },
 
-  globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**']),
+  // public/tesseract/ : fichiers OCR tiers copiés au build (scripts/copy-tesseract-assets.mjs).
+  globalIgnores([
+    '**/.claude/**',
+    '**/dist/**',
+    '**/dist-ssr/**',
+    '**/coverage/**',
+    '**/.astro/**',
+    'public/tesseract/**',
+  ]),
 
   ...pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
 
+  // Fichiers .astro (frontmatter, gabarit, scripts). Doc : https://ota-meshi.github.io/eslint-plugin-astro/
+  ...pluginAstro.configs['flat/recommended'],
+
   {
     ...pluginPlaywright.configs['flat/recommended'],
     files: ['e2e/**/*.{test,spec}.{js,ts,jsx,tsx}'],
+  },
+  {
+    files: ['e2e/**/*.{test,spec}.{js,ts,jsx,tsx}'],
+    // `audit()` (e2e/a11y.spec.ts) contient les assertions axe.
+    rules: { 'playwright/expect-expect': ['warn', { assertFunctionNames: ['audit'] }] },
   },
 
   {

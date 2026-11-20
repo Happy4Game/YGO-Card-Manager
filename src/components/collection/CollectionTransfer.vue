@@ -69,15 +69,22 @@ async function runImport() {
 </script>
 
 <template>
-  <section class="transfer" aria-labelledby="transfer-title">
-    <h2 id="transfer-title">Sauvegarde</h2>
-    <p>
-      Ta collection n'existe que sur cet appareil : exporte-la régulièrement pour ne pas la perdre.
-    </p>
+  <section class="transfer surface" aria-labelledby="transfer-title">
+    <div class="transfer__intro">
+      <h2 id="transfer-title">Sauvegarde</h2>
+      <p class="muted">
+        Ta collection n'existe que sur cet appareil : exporte-la régulièrement pour ne pas la
+        perdre.
+      </p>
+    </div>
 
     <div class="actions">
-      <button type="button" :disabled="busy" @click="runExport('json')">Exporter en JSON</button>
-      <button type="button" :disabled="busy" @click="runExport('csv')">Exporter en CSV</button>
+      <button type="button" class="btn--secondary" :disabled="busy" @click="runExport('json')">
+        Exporter en JSON
+      </button>
+      <button type="button" class="btn--secondary" :disabled="busy" @click="runExport('csv')">
+        Exporter en CSV
+      </button>
     </div>
 
     <form class="import" @submit.prevent="runImport">
@@ -88,28 +95,32 @@ async function runImport() {
 
       <fieldset>
         <legend>Mode d'import</legend>
-        <label>
+        <label class="check">
           <input v-model="mode" type="radio" name="import-mode" value="merge" />
           Fusionner avec ma collection
         </label>
-        <label>
+        <label class="check">
           <input v-model="mode" type="radio" name="import-mode" value="replace" />
           Remplacer toute ma collection
         </label>
       </fieldset>
 
-      <label v-if="mode === 'replace'" class="confirm">
+      <label v-if="mode === 'replace'" class="check confirm">
         <input v-model="confirmReplace" type="checkbox" />
         Je confirme vouloir effacer ma collection actuelle et la remplacer par ce fichier.
       </label>
 
-      <button type="submit" :disabled="busy">Importer</button>
+      <div>
+        <button type="submit" class="btn--primary" :disabled="busy">Importer</button>
+      </div>
     </form>
 
     <!-- Zone annoncée poliment par les lecteurs d'écran à chaque changement de contenu.
          Doc : https://developer.mozilla.org/fr/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-live -->
     <div class="messages" aria-live="polite">
-      <p v-if="message">{{ message }}</p>
+      <p v-if="message" class="notice" :class="{ 'notice--danger': errors.length > 0 }">
+        {{ message }}
+      </p>
       <ul v-if="errors.length > 0">
         <li v-for="(error, index) in errors" :key="index">{{ error }}</li>
       </ul>
@@ -118,29 +129,49 @@ async function runImport() {
 </template>
 
 <style scoped>
-.actions,
-.import {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  align-items: flex-end;
-  margin-bottom: 0.75rem;
-}
-.field {
+.transfer {
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  max-width: 100%;
+  gap: var(--space-4);
 }
+
+.transfer__intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.actions button {
+  flex: 1 1 10rem;
+}
+
+.import {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
 fieldset {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
 }
+
 .confirm {
-  flex-basis: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
 }
-button {
-  min-height: 2.75rem;
+
+.messages ul {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
 }
 </style>

@@ -11,6 +11,8 @@
  * venant du réseau, d'où le type `unknown` plutôt qu'un cast `as`.
  */
 import type { CardData, CardSet } from '@/domain/card'
+import type { CardPrices } from '@/domain/price'
+import { setCodeKey } from '@/domain/setCode'
 
 export const API_BASE_URL = 'https://db.ygoprodeck.com/api/v7'
 
@@ -91,6 +93,9 @@ export function toCardData(raw: unknown): CardData {
     throw new InvalidCardError(`Type manquant pour la carte ${id}`)
   }
 
+  const sets = Array.isArray(raw.card_sets)
+    ? raw.card_sets.map(toCardSet).filter((set): set is CardSet => set !== undefined)
+    : []
   const card: CardData = {
     id,
     name,
@@ -98,12 +103,19 @@ export function toCardData(raw: unknown): CardData {
     frameType: typeof raw.frameType === 'string' ? raw.frameType : '',
     desc: typeof raw.desc === 'string' ? raw.desc : '',
     race: typeof raw.race === 'string' ? raw.race : '',
-    sets: Array.isArray(raw.card_sets)
-      ? raw.card_sets.map(toCardSet).filter((set): set is CardSet => set !== undefined)
-      : [],
+    sets,
+    setKeys: [
+      ...new Set(sets.map((set) => setCodeKey(set.code)).filter((key) => key !== undefined)),
+    ],
   }
 
   // On n'ajoute les champs facultatifs que s'ils existent, pour garder des objets compacts.
+  // Les réponses traduites (ex. `language=fr`) contiennent aussi le nom anglais : on le garde
+  // pour chercher dans les deux langues à la fois.
+  const nameEn = optionalString(raw.name_en)
+  if (nameEn !== undefined && nameEn !== name) card.nameEn = nameEn
+  const typeLabel = optionalString(raw.humanReadableCardType)
+  if (typeLabel !== undefined) card.typeLabel = typeLabel
   const attribute = optionalString(raw.attribute)
   if (attribute !== undefined) card.attribute = attribute
   const archetype = optionalString(raw.archetype)
@@ -179,4 +191,45 @@ export async function fetchAllCards(
     throw new ApiFormatError('Liste de cartes introuvable dans la réponse')
   }
   return toCardList(body.data)
+}
+
+/** Nombre maximal d'identifiants par requête (garde l'URL courte). */
+const IDS_PER_REQUEST = 50
+
+function priceValue(value: unknown): number | null {
+  const parsed = typeof value === 'string' ? Number.parseFloat(value) : value
+  return typeof parsed === 'number' && Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+/** Extrait le prix Cardmarket d'un objet carte de l'API (`card_prices[0].cardmarket_price`). */
+export function toCardPrices(raw: unknown): CardPrices | undefined {
+  if (!isRecord(raw) || typeof raw.id !== 'number') return undefined
+  const first: unknown = Array.isArray(raw.card_prices) ? raw.card_prices[0] : undefined
+  return {
+    cardId: raw.id,
+    cardmarket: isRecord(first) ? priceValue(first.cardmarket_price) : null,
+  }
+}
+
+/**
+ * Prix actuels de quelques cartes seulement : `cardinfo.php?id=1,2,3` accepte plusieurs
+ * identifiants séparés par des virgules (guide officiel de l'API). Une petite requête par
+ * paquet de 50 cartes, au lieu de retélécharger toute la base (~18 Mo).
+ */
+export async function fetchCardPrices(
+  ids: readonly number[],
+  fetchFn: FetchFn = fetch,
+): Promise<CardPrices[]> {
+  const prices: CardPrices[] = []
+  for (let start = 0; start < ids.length; start += IDS_PER_REQUEST) {
+    const chunk = ids.slice(start, start + IDS_PER_REQUEST)
+    const body = await getJson(`${API_BASE_URL}/cardinfo.php?id=${chunk.join(',')}`, fetchFn)
+    const data: unknown = isRecord(body) ? body.data : undefined
+    if (!Array.isArray(data)) throw new ApiFormatError('Réponse inattendue pour les prix')
+    for (const raw of data) {
+      const price = toCardPrices(raw)
+      if (price) prices.push(price)
+    }
+  }
+  return prices
 }

@@ -26,6 +26,7 @@ function fakeCard(id: number, name: string): CardData {
     desc: 'Texte de test.',
     race: 'Warrior',
     sets: [{ code: 'TST-FR001', name: 'Extension de test', rarity: 'Common' }],
+    setKeys: ['TST-001'],
   }
 }
 

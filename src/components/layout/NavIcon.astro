@@ -1,0 +1,80 @@
+---
+/**
+ * Icônes dessinées pour ce projet (SVG en ligne, licence MIT, aucun asset officiel).
+ * `aria-hidden` : le libellé texte du lien suffit, l'icône est décorative.
+ */
+export type IconName = 'search' | 'scan' | 'collection' | 'about' | 'logo'
+
+interface Props {
+  name: IconName
+  size?: number
+}
+
+const { name, size = 24 } = Astro.props
+---
+
+<svg
+  class="icon"
+  width={size}
+  height={size}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.9"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+  focusable="false"
+>
+  {name === 'search' && (
+    <>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m15.5 15.5 5 5" />
+    </>
+  )}
+  {name === 'scan' && (
+    <>
+      <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" />
+      <rect x="8.5" y="7" width="7" height="10" rx="1.2" />
+      <path d="M6.5 12h11" />
+    </>
+  )}
+  {name === 'collection' && (
+    <>
+      <rect x="8" y="3.5" width="11" height="15" rx="1.8" />
+      <path d="M5 7v11.5A2.5 2.5 0 0 0 7.5 21H15" />
+      <path d="M11 8h5M11 11h3" />
+    </>
+  )}
+  {name === 'about' && (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5.5" />
+      <path d="M12 7.6v.1" stroke-width="2.6" />
+    </>
+  )}
+  {name === 'logo' && (
+    <>
+      <rect x="3.5" y="5.5" width="10" height="14" rx="1.8" transform="rotate(-10 8.5 12.5)" />
+      <rect
+        x="9.5"
+        y="3.5"
+        width="10"
+        height="14"
+        rx="1.8"
+        fill="currentColor"
+        fill-opacity="0.18"
+      />
+      <path
+        d="m14.5 7.6.9 1.9 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3z"
+        stroke-width="1.4"
+      />
+    </>
+  )}
+</svg>
+
+<style>
+  .icon {
+    flex: none;
+  }
+</style>

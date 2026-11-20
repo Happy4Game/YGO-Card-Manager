@@ -1,0 +1,519 @@
+/*
+ * Styles globaux : reset, typographie, formulaires, boutons et utilitaires.
+ * Les couleurs et dimensions viennent toutes de tokens.css.
+ * `:where()` garde une spécificité nulle : un composant peut toujours surcharger ces styles.
+ * Doc MDN : https://developer.mozilla.org/fr/docs/Web/CSS/:where
+ */
+@import './tokens.css';
+
+/* ---------- Reset moderne ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Le défilement vers une ancre ne passe pas sous l'en-tête collant. */
+  scroll-padding-top: calc(var(--header-height) + var(--space-4));
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+li,
+dd {
+  overflow-wrap: break-word;
+}
+
+/* ---------- Transitions entre pages ---------- */
+/* Transition native du navigateur entre deux pages (sans JavaScript, compatible CSP).
+   Doc : https://developer.mozilla.org/fr/docs/Web/CSS/@view-transition */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+
+/* ---------- Typographie ---------- */
+:where(h1, h2, h3, h4) {
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+:where(h1) {
+  font-size: var(--text-xl);
+  font-weight: 750;
+}
+
+:where(h2) {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+:where(h3) {
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+
+:where(p) {
+  text-wrap: pretty;
+}
+
+:where(a) {
+  color: var(--color-primary);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+:where(a:hover) {
+  text-decoration-thickness: 2px;
+}
+
+:where(ul, ol) {
+  padding-left: 1.25rem;
+}
+
+:where(code, kbd, samp) {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+:where(small) {
+  font-size: var(--text-sm);
+}
+
+::selection {
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+}
+
+/* ---------- Focus visible (WCAG 2.4.7 et 2.4.11) ---------- */
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Titres et zones rendus focalisables par script (tabindex="-1") : pas d'anneau au clic. */
+[tabindex='-1']:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Titres focalisés par script pour guider le lecteur d'écran : ce ne sont pas des contrôles,
+   un soulignement discret suffit à situer le focus. */
+:where(h1, h2, h3)[tabindex='-1']:focus {
+  outline: none;
+  text-decoration: underline;
+  text-decoration-color: var(--color-focus);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 0.3em;
+}
+
+/* ---------- Boutons ---------- */
+:where(button, .btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+:where(button, .btn):hover {
+  background: var(--color-surface-2);
+}
+
+:where(button, .btn):active {
+  transform: scale(0.98);
+}
+
+:where(button, .btn):disabled,
+:where(.btn)[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.btn--primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn--primary:hover {
+  background: color-mix(in srgb, var(--color-primary) 88%, var(--color-text));
+}
+
+.btn--secondary {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+
+.btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-primary);
+}
+
+.btn--ghost:hover {
+  background: var(--color-primary-soft);
+}
+
+.btn--danger {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-danger-contrast);
+}
+
+.btn--danger:hover {
+  background: color-mix(in srgb, var(--color-danger) 88%, var(--color-text));
+}
+
+.btn--icon {
+  min-width: var(--tap-target);
+  padding: var(--space-2);
+}
+
+.btn--block {
+  width: 100%;
+}
+
+.btn--sm {
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+/* Les petits boutons gardent une zone tactile de 44 px grâce à un pseudo-élément. */
+.btn--sm {
+  position: relative;
+}
+
+.btn--sm::after {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+
+/* ---------- Champs de formulaire ---------- */
+:where(label) {
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+:where(
+  input:not([type='checkbox'], [type='radio'], [type='file'], [type='range']),
+  select,
+  textarea
+) {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  /* 16 px minimum : iOS ne zoome pas sur le champ au focus. */
+  font-size: max(16px, var(--text-md));
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+:where(input, select, textarea)::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+:where(input:not([type='checkbox'], [type='radio'], [type='file']), select, textarea):hover {
+  border-color: color-mix(in srgb, var(--color-border) 60%, var(--color-text-muted));
+}
+
+:where(
+  input:not([type='checkbox'], [type='radio'], [type='file']),
+  select,
+  textarea
+):focus-visible {
+  border-color: var(--color-focus);
+  outline-offset: 0;
+  outline-width: 2px;
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+:where(input[readonly]) {
+  background: var(--color-surface-2);
+}
+
+:where(textarea) {
+  resize: vertical;
+}
+
+/* Flèche personnalisée des listes déroulantes (dessin SVG original, pas d'image externe). */
+:where(select) {
+  appearance: none;
+  padding-right: 2.5rem;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
+    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.15rem) 55%,
+    calc(100% - 0.8rem) 55%;
+  background-size: 0.35rem 0.35rem;
+  background-repeat: no-repeat;
+}
+
+:where(input[type='checkbox'], input[type='radio']) {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+:where(input[type='file']) {
+  max-width: 100%;
+  font-size: var(--text-sm);
+}
+
+:where(input[type='file'])::file-selector-button {
+  margin-right: var(--space-3);
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+:where(fieldset) {
+  min-width: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+:where(legend) {
+  padding-inline: var(--space-1);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+/* Champ = libellé + contrôle + aide, empilés. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Case à cocher ou bouton radio suivi de son libellé, cliquable sur toute la ligne. */
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap-target);
+  font-size: var(--text-md);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ---------- Surfaces ---------- */
+.surface {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (min-width: 40rem) {
+  .surface {
+    padding: var(--space-5);
+  }
+}
+
+.surface--muted {
+  background: var(--color-surface-2);
+  box-shadow: none;
+}
+
+/* ---------- Puces et badges ---------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 1.75rem;
+  padding: 0.125rem var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.0625rem var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.badge--accent {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.badge--success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.badge--danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+/* ---------- Messages ---------- */
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  font-weight: 600;
+}
+
+.notice--danger {
+  border-left-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.notice--success {
+  border-left-color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+/* ---------- Utilitaires ---------- */
+/* Masque visuellement un texte tout en le laissant aux lecteurs d'écran.
+   Doc : https://www.a11yproject.com/posts/how-to-hide-content/ */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+/* Titre de page + sous-titre. */
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.page-header p {
+  color: var(--color-text-muted);
+}
+
+/* ---------- Mouvement réduit ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

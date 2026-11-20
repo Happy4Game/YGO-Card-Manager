@@ -1,0 +1,92 @@
+/*
+ * Jetons de design partagés (couleurs, espacements, rayons, typo).
+ * Tous les composants utilisent ces variables CSS : un thème se change ici seulement.
+ * Doc MDN : https://developer.mozilla.org/fr/docs/Web/CSS/Using_CSS_custom_properties
+ * Contrastes visés : WCAG 2.2 AA (4.5:1 pour le texte).
+ */
+:root {
+  color-scheme: light dark;
+
+  --color-bg: #f6f7fb;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef1f7;
+  --color-text: #141a26;
+  --color-text-muted: #4a5568;
+  --color-border: #d5dbe6;
+  --color-primary: #1e4fd8;
+  --color-primary-contrast: #ffffff;
+  --color-accent: #b7791f;
+  --color-success: #1f7a4d;
+  --color-danger: #c0392b;
+  --color-focus: #1e4fd8;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.25rem;
+  --radius-pill: 999px;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.08);
+  --shadow-md: 0 6px 20px rgb(0 0 0 / 0.12);
+  --transition-fast: 120ms ease-out;
+
+  /* Ajouts (refonte Astro) : teintes douces, contrastes de texte et dimensions de mise en page. */
+  --color-primary-soft: #e3eafc;
+  --color-danger-soft: #fbe9e7;
+  --color-danger-contrast: #ffffff;
+  --color-success-soft: #e3f3ea;
+  --color-accent-soft: #fbf1df;
+  --color-overlay: rgb(246 247 251 / 0.85);
+  --shadow-lg: 0 12px 32px rgb(20 26 38 / 0.16);
+  --transition-base: 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  --header-height: 3.5rem;
+  --tabbar-height: 4rem;
+  --content-max: 64rem;
+  --tap-target: 2.75rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f131c;
+    --color-surface: #171d29;
+    --color-surface-2: #212a3a;
+    --color-text: #e8ecf4;
+    --color-text-muted: #a3aec2;
+    --color-border: #2f3a4f;
+    --color-primary: #7aa2ff;
+    --color-primary-contrast: #0b1020;
+    --color-accent: #f0b54a;
+    --color-success: #4cc98a;
+    --color-danger: #ff7b6e;
+    --color-focus: #7aa2ff;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 6px 20px rgb(0 0 0 / 0.5);
+    --color-primary-soft: #1d2945;
+    --color-danger-soft: #3a1f1f;
+    --color-danger-contrast: #0b1020;
+    --color-success-soft: #173326;
+    --color-accent-soft: #3a2d16;
+    --color-overlay: rgb(15 19 28 / 0.85);
+    --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-base: 0ms;
+  }
+}

@@ -40,3 +40,8 @@ __screenshots__/
 
 test-results/
 playwright-report/
+
+# Astro
+.astro/
+# Lecteur OCR auto-hébergé : copié depuis node_modules au build (scripts/copy-tesseract-assets.mjs)
+public/tesseract/

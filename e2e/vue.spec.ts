@@ -6,45 +6,43 @@ test.beforeEach(async ({ page }) => {
   await page.route(/https:\/\/(db|images)\.ygoprodeck\.com\//, (route) => route.abort())
 })
 
+// La recherche elle-même a ses propres tests e2e ; ici, on vérifie la page et la navigation.
 test("affiche la page de recherche et la navigation à l'accueil", async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1, name: 'Recherche' })).toBeVisible()
+  await expect(page).toHaveTitle('Recherche · Card Manager')
 
   const nav = page.getByRole('navigation', { name: 'Navigation principale' })
-  await expect(nav.getByRole('link', { name: 'Recherche' })).toBeVisible()
-  await expect(nav.getByRole('link', { name: 'Ma collection' })).toBeVisible()
-  await expect(nav.getByRole('link', { name: 'À propos' })).toBeVisible()
-
-  await expect(
-    page.getByRole('button', { name: 'Télécharger / mettre à jour les cartes' }),
-  ).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Recherche' })).toHaveAttribute('aria-current', 'page')
+  await expect(nav.getByRole('link', { name: 'Scanner' })).toHaveAttribute('href', '/scan/')
+  await expect(nav.getByRole('link', { name: 'Collection' })).toHaveAttribute(
+    'href',
+    '/collection/',
+  )
+  await expect(nav.getByRole('link', { name: 'À propos' })).toHaveAttribute('href', '/about/')
 })
 
-test('télécharge des cartes fictives puis les recherche hors ligne', async ({ page }) => {
-  await page.route('https://db.ygoprodeck.com/api/v7/checkDBVer.php', (route) =>
-    route.fulfill({ json: [{ database_version: 'test-1', last_update: '2026-01-01' }] }),
-  )
-  await page.route('https://db.ygoprodeck.com/api/v7/cardinfo.php?language=fr', (route) =>
-    route.fulfill({
-      json: {
-        data: [
-          { id: 10000001, name: 'Golem de Test', type: 'Normal Monster', race: 'Rock', atk: 1 },
-          { id: 10000002, name: 'Sort Imaginaire', type: 'Spell Card', race: 'Normal' },
-        ],
-      },
-    }),
-  )
-
+test('la navigation mène à chaque page et marque la page courante', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Télécharger / mettre à jour les cartes' }).click()
-  await expect(page.getByText('2 cartes enregistrées sur cet appareil.')).toBeVisible()
+  const nav = page.getByRole('navigation', { name: 'Navigation principale' })
 
-  await page.getByLabel('Nom de la carte').fill('golem')
-  await page.getByRole('button', { name: 'Rechercher' }).click()
-  await expect(page.getByText('1 carte trouvée, page 1 sur 1.')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Golem de Test' })).toBeVisible()
-  await expect(page.getByRole('link', { name: /Ajouter à ma collection/ })).toHaveAttribute(
-    'href',
-    '#/collection?add=10000001',
-  )
+  for (const [label, heading] of [
+    ['Scanner', 'Scanner'],
+    ['Collection', 'Ma collection'],
+    ['À propos', 'À propos'],
+    ['Recherche', 'Recherche'],
+  ] as const) {
+    await nav.getByRole('link', { name: label }).click()
+    await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
+    await expect(nav.getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page')
+  }
+})
+
+test("le lien d'évitement mène au contenu principal", async ({ page }) => {
+  await page.goto('/about/')
+  await page.keyboard.press('Tab')
+  const skipLink = page.getByRole('link', { name: 'Aller au contenu' })
+  await expect(skipLink).toBeFocused()
+  await skipLink.press('Enter')
+  await expect(page.locator('main')).toBeFocused()
 })

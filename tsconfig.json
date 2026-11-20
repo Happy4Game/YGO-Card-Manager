@@ -1,14 +1,14 @@
+// TSConfig d'Astro (pages .astro, éditeur, `astro check`).
+// Les fichiers .vue et les tests sont vérifiés par `vue-tsc --build tsconfig.vue.json`.
+// Doc : https://docs.astro.build/fr/guides/typescript/
 {
-  "files": [],
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
-    },
-    {
-      "path": "./tsconfig.app.json"
-    },
-    {
-      "path": "./tsconfig.vitest.json"
+  "extends": "astro/tsconfigs/strict",
+  "include": [".astro/types.d.ts", "src/**/*"],
+  "exclude": ["dist", "src/**/__tests__/*", "src/test/*"],
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@/*": ["./src/*"]
     }
-  ]
+  }
 }
