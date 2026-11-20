@@ -44,6 +44,9 @@ function contentSecurityPolicy(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Sur GitHub Pages, l'app est servie sous /<nom-du-dépôt>/ : le workflow de déploiement
+  // passe ce chemin via VITE_BASE. Doc : https://vite.dev/guide/static-deploy#github-pages
+  base: process.env.VITE_BASE ?? '/',
   plugins: [
     vue(),
     vueDevTools(),

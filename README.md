@@ -6,6 +6,9 @@ serveur, et l'app fonctionne hors ligne une fois les cartes téléchargées.
 
 ## Installer l'app sur son téléphone
 
+Adresse : <https://happy4game.github.io/YGO-Card-Manager/> (déployée automatiquement à chaque
+fusion sur `master` par `.github/workflows/deploy.yml`).
+
 - **Android (Chrome)** : ouvrir le site, menu ⋮ > « Installer l'application ».
 - **iPhone (Safari)** : bouton Partager > « Sur l'écran d'accueil ».
 
