@@ -1,0 +1,24 @@
+# Lancement manuel (onglet Actions > Spike YGOPRODeck > Run workflow) ou quand le script change.
+# Fait 3 requêtes vers l'API pour mesurer CORS et la taille des données.
+name: Spike YGOPRODeck
+
+on:
+  workflow_dispatch:
+  # Se lance aussi quand le script change, pour pouvoir le tester depuis une branche.
+  push:
+    paths:
+      - scripts/spike-ygoprodeck.mjs
+      - .github/workflows/spike-ygoprodeck.yml
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/spike-ygoprodeck.mjs
