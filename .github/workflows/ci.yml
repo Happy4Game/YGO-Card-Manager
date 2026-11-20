@@ -1,0 +1,38 @@
+# Intégration continue : chaque push et chaque PR doivent passer ces étapes.
+# Doc officielle : https://docs.github.com/fr/actions
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Format
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint:ci
+      - name: Type-check
+        run: npm run type-check
+      - name: Tests unitaires
+        run: npm run test:unit -- --run
+      - name: Build
+        run: npm run build-only
+      - name: Audit des dépendances
+        run: npm audit --audit-level=high --omit=dev
+      - name: Navigateurs Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Tests e2e
+        run: npx playwright test --project=chromium
