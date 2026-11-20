@@ -17,7 +17,8 @@ export default defineConfigWithVueTs(
     files: ['**/*.{vue,ts,mts,tsx}'],
   },
 
-  globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**']),
+  // public/tesseract/ : fichiers OCR tiers copiés au build (scripts/copy-tesseract-assets.mjs).
+  globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**', 'public/tesseract/**']),
 
   ...pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,

@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "npm run assets:ocr",
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test:unit": "vitest",
     "test:e2e": "playwright test",
+    "prebuild-only": "npm run assets:ocr",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "run-s lint:*",
@@ -18,13 +20,19 @@
     "lint:ci": "oxlint . && eslint .",
     "format:check": "prettier --check src/ e2e/ scripts/",
     "spike:api": "node scripts/spike-ygoprodeck.mjs",
-    "check:assets": "node scripts/check-no-card-assets.mjs"
+    "check:assets": "node scripts/check-no-card-assets.mjs",
+    "assets:ocr": "node scripts/copy-tesseract-assets.mjs"
   },
   "dependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/fra": "1.0.0",
     "dexie": "^4.4.7",
     "pinia": "^4.1.0",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0",
     "vue": "^3.5.46",
-    "vue-router": "^5.5.1"
+    "vue-router": "^5.5.1",
+    "wasm-feature-detect": "1.10.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
