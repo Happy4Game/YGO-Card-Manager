@@ -25,3 +25,8 @@ export function setCodeKey(code: string): string | undefined {
   const parsed = parseSetCode(code)
   return parsed ? `${parsed.prefix}-${parsed.number}` : undefined
 }
+
+/** Le texte entier est-il un code d'impression valide (ex. « LOB-FR001 », « MP23-FR045 ») ? */
+export function isSetCode(text: string): boolean {
+  return /^[A-Z0-9]{2,5}-[A-Z]{0,2}\d{3}$/.test(text.trim().toUpperCase())
+}
