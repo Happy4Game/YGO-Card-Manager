@@ -32,7 +32,18 @@ type DrawFakeCard = (
   x: number,
   y: number,
   height: number,
+  name?: string,
+  code?: string,
 ) => void
+
+/** Seconde carte FICTIVE, pour le scan de plusieurs cartes à la fois. */
+const FAKE_CARD_2 = {
+  ...FAKE_CARD,
+  id: 10000002,
+  name: 'Golem Imaginaire',
+  sets: [{ code: 'AUT-FR007', name: 'Autre Boîte', rarity: 'Ultra Rare' }],
+  setKeys: ['AUT-007'],
+}
 
 /**
  * Dessine une carte fictive (format 59×86) : cadre, illustration vide, nom et code d'impression
@@ -44,6 +55,8 @@ function drawFakeCard(
   x: number,
   y: number,
   height: number,
+  name = 'Dragon de Test',
+  code = 'TST-FR001',
 ): void {
   const width = (height * 59) / 86
   context.fillStyle = '#c98a3d'
@@ -57,9 +70,9 @@ function drawFakeCard(
   context.fillStyle = '#111'
   context.textBaseline = 'middle'
   context.font = `bold ${String(Math.round(height * 0.045))}px sans-serif`
-  context.fillText('Dragon de Test', x + width * 0.08, y + height * 0.08)
+  context.fillText(name, x + width * 0.08, y + height * 0.08)
   context.font = `bold ${String(Math.round(height * 0.032))}px sans-serif`
-  context.fillText('TST-FR001', x + width * 0.6, y + height * 0.733)
+  context.fillText(code, x + width * 0.6, y + height * 0.733)
 }
 
 /**
@@ -68,7 +81,7 @@ function drawFakeCard(
  */
 async function fakeCamera(
   page: Page,
-  mode: 'card' | 'denied' | 'none',
+  mode: 'card' | 'two-cards' | 'denied' | 'none',
   permission: 'prompt' | 'granted' = 'prompt',
 ) {
   await page.addInitScript({
@@ -100,12 +113,21 @@ async function fakeCamera(
         context.fillStyle = '#20252e'
         context.fillRect(0, 0, canvas.width, canvas.height)
         const height = canvas.height * 0.84
-        scope.__drawFakeCard(
-          context,
-          (canvas.width - (height * 59) / 86) / 2,
-          (canvas.height - height) / 2,
-          height,
-        )
+        const width = (height * 59) / 86
+        const top = (canvas.height - height) / 2
+        if (scope.__cameraMode === 'two-cards') {
+          scope.__drawFakeCard(context, canvas.width / 2 - width - 24, top, height)
+          scope.__drawFakeCard(
+            context,
+            canvas.width / 2 + 24,
+            top,
+            height,
+            'Golem Imaginaire',
+            'AUT-FR007',
+          )
+        } else {
+          scope.__drawFakeCard(context, (canvas.width - width) / 2, top, height)
+        }
       }
       paint()
       setInterval(paint, 100)
@@ -118,24 +140,27 @@ async function fakeCamera(
   })
 }
 
-/** Ajoute la carte fictive dans IndexedDB (base créée par l'app au premier affichage). */
+/** Ajoute les cartes fictives dans IndexedDB (base créée par l'app au premier affichage). */
 async function seedCard(page: Page) {
   await expect(page.getByText('Aucune carte n’est encore enregistrée')).toBeVisible()
-  await page.evaluate(async (card) => {
-    await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open('card-manager')
-      request.onerror = () => reject(request.error ?? new Error('IndexedDB'))
-      request.onsuccess = () => {
-        const tx = request.result.transaction('cards', 'readwrite')
-        tx.objectStore('cards').put(card)
-        tx.oncomplete = () => {
-          request.result.close()
-          resolve()
+  await page.evaluate(
+    async (cards) => {
+      await new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open('card-manager')
+        request.onerror = () => reject(request.error ?? new Error('IndexedDB'))
+        request.onsuccess = () => {
+          const tx = request.result.transaction('cards', 'readwrite')
+          for (const item of cards) tx.objectStore('cards').put(item)
+          tx.oncomplete = () => {
+            request.result.close()
+            resolve()
+          }
+          tx.onerror = () => reject(tx.error ?? new Error('transaction'))
         }
-        tx.onerror = () => reject(tx.error ?? new Error('transaction'))
-      }
-    })
-  }, FAKE_CARD)
+      })
+    },
+    [FAKE_CARD, FAKE_CARD_2],
+  )
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Scanner une carte', level: 1 })).toBeVisible()
 }
@@ -194,7 +219,7 @@ test('autorisation déjà donnée : la caméra démarre seule et s’arrête', a
   await page.goto(SCAN_URL)
   const stop = page.getByRole('button', { name: 'Arrêter la caméra' })
   await expect(stop).toBeVisible()
-  await expect(page.getByRole('status')).toContainText('Place la carte dans le cadre')
+  await expect(page.getByRole('status')).toContainText('Montre une ou plusieurs cartes')
   await stop.click()
   await expect(page.getByRole('button', { name: 'Activer la caméra' })).toBeVisible()
 })
@@ -236,6 +261,8 @@ test.describe('OCR réel (Tesseract.js dans le navigateur)', () => {
   // Premier chargement du moteur (~4 Mo) et des données de langue (~3 Mo), puis la lecture.
   test.setTimeout(90_000)
 
+  const tray = (page: Page) => page.getByRole('region', { name: /Cartes détectées/ })
+
   test('lit en continu le code d’une carte filmée', async ({ page }) => {
     await fakeCamera(page, 'card')
     await page.goto(SCAN_URL)
@@ -243,10 +270,48 @@ test.describe('OCR réel (Tesseract.js dans le navigateur)', () => {
     await page.getByRole('button', { name: 'Activer la caméra' }).click()
     await expect(page.getByRole('button', { name: 'Arrêter la caméra' })).toBeVisible()
 
-    const sheet = page.getByRole('region', { name: 'Dragon de Test' })
-    await expect(sheet).toBeVisible({ timeout: 60_000 })
-    await expect(page.getByRole('status').first()).toContainText('Code lu : TST-FR001')
+    await expect(tray(page)).toContainText('Dragon de Test', { timeout: 60_000 })
+    await expect(tray(page)).toContainText('TST-FR001')
+    await expect(page.getByRole('status').first()).toContainText('Carte détectée : Dragon de Test')
     await expectAddLink(page)
+  })
+
+  test('lit plusieurs cartes à la fois et les ajoute d’un coup', async ({ page }) => {
+    await fakeCamera(page, 'two-cards')
+    await page.goto(SCAN_URL)
+    await seedCard(page)
+    await page.getByRole('button', { name: 'Activer la caméra' }).click()
+
+    await expect(tray(page)).toContainText('Dragon de Test', { timeout: 60_000 })
+    await expect(tray(page)).toContainText('Golem Imaginaire', { timeout: 30_000 })
+    // La rareté de l'impression lue est proposée.
+    await expect(tray(page).getByLabel('Rareté de Golem Imaginaire')).toHaveValue('Ultra Rare')
+
+    await tray(page).getByRole('button', { name: 'Ajouter 2 cartes à ma collection' }).click()
+    await expect(page.getByRole('status').first()).toContainText(
+      '2 cartes ajoutées à ta collection.',
+    )
+    await expect(tray(page)).toBeHidden()
+  })
+
+  test('le bouton photo fige l’image et lit toutes les cartes', async ({ page }) => {
+    await fakeCamera(page, 'two-cards')
+    await page.goto(SCAN_URL)
+    await seedCard(page)
+    await page.getByRole('button', { name: 'Activer la caméra' }).click()
+    await page.getByRole('button', { name: 'Prendre une photo et lire toutes les cartes' }).click()
+
+    await expect(page.getByRole('status').first()).toContainText(
+      '2 cartes reconnues sur la photo',
+      {
+        timeout: 60_000,
+      },
+    )
+    await expect(tray(page)).toContainText('Golem Imaginaire')
+    await page.getByRole('button', { name: 'Reprendre la caméra' }).click()
+    await expect(
+      page.getByRole('button', { name: 'Prendre une photo et lire toutes les cartes' }),
+    ).toBeVisible()
   })
 
   test('lit le code sur une photo importée', async ({ page }) => {
@@ -268,9 +333,7 @@ test.describe('OCR réel (Tesseract.js dans le navigateur)', () => {
       mimeType: 'image/png',
       buffer: Buffer.from(dataUrl.split(',')[1] ?? '', 'base64'),
     })
-    await expect(page.getByRole('region', { name: 'Dragon de Test' })).toBeVisible({
-      timeout: 60_000,
-    })
+    await expect(tray(page)).toContainText('Dragon de Test', { timeout: 60_000 })
     await expectAddLink(page)
   })
 })

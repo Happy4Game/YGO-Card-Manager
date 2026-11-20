@@ -28,7 +28,31 @@ export interface OcrProgress {
 /** Image acceptée par le moteur (un canvas, préparé par imageProcessing). */
 export type OcrImage = HTMLCanvasElement
 
+/** Rectangle en pixels de l'image lue (coin haut gauche, largeur, hauteur). */
+export interface OcrBox {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface OcrWord {
+  text: string
+  box: OcrBox
+}
+
+/** Ligne de texte trouvée n'importe où dans l'image, avec la position de chaque mot. */
+export interface OcrLine {
+  text: string
+  words: OcrWord[]
+}
+
 export interface OcrEngine {
+  /**
+   * Cherche du texte partout dans l'image (mode « texte épars ») et renvoie les lignes avec
+   * leurs positions : c'est ce qui permet de lire plusieurs cartes d'un coup.
+   */
+  findLines(image: OcrImage): Promise<OcrLine[]>
   /** Lit une ligne de code d'impression (lettres majuscules, chiffres et tiret uniquement). */
   readCode(image: OcrImage): Promise<OcrReading>
   /** Lit du texte épars (zone large, ex. bas d'une carte Pendule ou photo importée). */
@@ -132,6 +156,29 @@ async function spawn(
   )
 }
 
+const toBox = (bbox: Tesseract.Bbox): OcrBox => ({
+  x: bbox.x0,
+  y: bbox.y0,
+  width: bbox.x1 - bbox.x0,
+  height: bbox.y1 - bbox.y0,
+})
+
+/** Aplatit la hiérarchie blocs → paragraphes → lignes renvoyée par Tesseract.js. */
+export function toLines(blocks: readonly Tesseract.Block[] | null): OcrLine[] {
+  const lines: OcrLine[] = []
+  for (const block of blocks ?? []) {
+    for (const paragraph of block.paragraphs) {
+      for (const line of paragraph.lines) {
+        lines.push({
+          text: line.text,
+          words: line.words.map((word) => ({ text: word.text, box: toBox(word.bbox) })),
+        })
+      }
+    }
+  }
+  return lines
+}
+
 const toReading = (result: Tesseract.RecognizeResult): OcrReading => ({
   text: result.data.text,
   confidence: result.data.confidence,
@@ -169,6 +216,14 @@ export async function createOcrEngine(
   }
 
   return {
+    findLines: (image) =>
+      serial(async () => {
+        await useCodeMode('sparse')
+        // « blocks » : positions des lignes et des mots (sortie désactivée par défaut).
+        // Doc : https://github.com/naptha/tesseract.js/blob/master/docs/api.md#worker-recognize
+        const result = await codeWorker.recognize(image, {}, { text: true, blocks: true })
+        return toLines(result.data.blocks)
+      }),
     readCode: (image) =>
       serial(async () => {
         await useCodeMode('line')

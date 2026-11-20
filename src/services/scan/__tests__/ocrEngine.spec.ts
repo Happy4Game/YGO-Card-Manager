@@ -166,3 +166,22 @@ describe('createOcrEngine', () => {
     expect(maxActive).toBe(1)
   })
 })
+
+describe('toLines', () => {
+  it('aplatit blocs, paragraphes et lignes avec la position de chaque mot', async () => {
+    const { toLines } = await import('../ocrEngine')
+    const bbox = { x0: 10, y0: 20, x1: 110, y1: 45 }
+    const blocks = [
+      {
+        paragraphs: [{ lines: [{ text: 'TST-FR001\n', words: [{ text: 'TST-FR001', bbox }] }] }],
+      },
+    ] as unknown as Parameters<typeof toLines>[0]
+    expect(toLines(blocks)).toEqual([
+      {
+        text: 'TST-FR001\n',
+        words: [{ text: 'TST-FR001', box: { x: 10, y: 20, width: 100, height: 25 } }],
+      },
+    ])
+    expect(toLines(null)).toEqual([])
+  })
+})
