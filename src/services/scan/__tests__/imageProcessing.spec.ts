@@ -160,7 +160,7 @@ describe('adaptiveThreshold', () => {
     const out = adaptiveThreshold(image, { radius: 2, offset: 12 })
     const row = out.data.slice(2 * width, 3 * width)
     // Fond sombre uniforme : blanc. Trait plus sombre que la zone claire : noir.
-    expect(row.slice(0, 4)).toEqual([255, 255, 255, 255])
+    expect(Array.from(row.slice(0, 4))).toEqual([255, 255, 255, 255])
     expect(row[9]).toBe(0)
     expect(row[11]).toBe(255)
   })
