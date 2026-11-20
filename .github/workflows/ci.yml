@@ -15,7 +15,7 @@ jobs:
     # Ubuntu 24.04 fixé : Playwright 1.59 ne supporte pas ubuntu-latest (26.04).
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
         with:
           node-version: 22
