@@ -12,6 +12,7 @@ import {
   type CollectionItem,
   type NewCollectionEntry,
 } from '@/services/collection'
+import { rememberDefaults } from '@/services/quickAdd'
 import { useCollectionStore } from '@/stores/collection'
 import { usePricesStore } from '@/stores/prices'
 import { useSettingsStore } from '@/stores/settings'
@@ -113,6 +114,12 @@ async function save(entry: NewCollectionEntry) {
       message.value = `Entrée modifiée : ${current.entry.cardName}.`
     } else {
       await store.add(entry)
+      // Les prochains ajouts (rapides ou non) reprennent ces réglages.
+      rememberDefaults({
+        language: entry.language,
+        condition: entry.condition,
+        location: entry.location,
+      })
       const card = await store.findCard(entry.cardId)
       const name = card?.name ?? fallbackCardName(entry.cardId)
       message.value = `Ajouté à la collection : ${name} × ${entry.quantity}.`
@@ -203,8 +210,6 @@ async function remove(item: CollectionItem) {
 
     <p v-if="loading" class="muted">Chargement de la collection…</p>
     <template v-else>
-      <CollectionStats v-if="!isEmpty" :stats="stats" />
-
       <section class="entries" aria-labelledby="entries-title">
         <h2 id="entries-title" ref="listHeading" tabindex="-1">Mes cartes</h2>
 
@@ -287,6 +292,9 @@ async function remove(item: CollectionItem) {
           </div>
         </template>
       </section>
+
+      <!-- Résumé après la liste : sur mobile, les cartes viennent en premier. -->
+      <CollectionStats v-if="!isEmpty" :stats="stats" />
     </template>
 
     <CollectionTransfer />

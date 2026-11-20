@@ -11,6 +11,8 @@ import {
 import { CONDITION_LABELS } from './labels'
 import { db } from '@/db/database'
 import { listRarities } from '@/services/rarities'
+import { pickPrint, readDefaults } from '@/services/quickAdd'
+import { setCodeKey } from '@/domain/setCode'
 
 /** Raretés connues (déduites des cartes téléchargées), proposées dans la liste du champ. */
 const rarities = ref<string[]>([])
@@ -42,16 +44,19 @@ const fieldId = (name: string) => `${uid}-${name}`
 /** Valeur choisie dans la liste des impressions : index dans `card.sets`, ou saisie libre. */
 const FREE_SET = 'free'
 
+/** Pour un ajout : derniers réglages utilisés (langue, état, emplacement). */
+const defaults = props.entry ? undefined : readDefaults()
+
 const draft = reactive({
   // Champ texte : un <input type="number"> vide ne vaut pas un nombre, on convertit à l'envoi.
   cardId: String(props.entry?.cardId ?? props.initialCardId ?? ''),
   setChoice: FREE_SET,
   setCode: props.entry?.setCode ?? props.initialSetCode ?? '',
   rarity: props.entry?.rarity ?? '',
-  language: props.entry?.language ?? 'fr',
-  condition: props.entry?.condition ?? 'Near Mint',
+  language: props.entry?.language ?? defaults?.language ?? 'fr',
+  condition: props.entry?.condition ?? defaults?.condition ?? 'Near Mint',
   quantity: props.entry?.quantity ?? 1,
-  location: props.entry?.location ?? '',
+  location: props.entry?.location ?? defaults?.location ?? '',
   note: props.entry?.note ?? '',
 })
 
@@ -70,8 +75,18 @@ watch(
     // Ignore une réponse arrivée après une nouvelle saisie.
     if (cardId !== parsedCardId.value) return
     card.value = found
+    // Ajout : impression déduite du code lu, ou la seule impression connue.
+    if (found && !isEdit.value && draft.rarity === '') {
+      const print = pickPrint(found, draft.setCode || undefined)
+      draft.setCode = print.code
+      draft.rarity = print.rarity
+    }
+    // Comparaison sans la région (« LOB-FR001 » = « LOB-EN001 ») : même impression.
+    const key = draft.setCode ? setCodeKey(draft.setCode) : undefined
     const index = found?.sets.findIndex(
-      (set) => set.code === draft.setCode && (draft.rarity === '' || set.rarity === draft.rarity),
+      (set) =>
+        (set.code === draft.setCode || (key !== undefined && setCodeKey(set.code) === key)) &&
+        (draft.rarity === '' || set.rarity === draft.rarity),
     )
     draft.setChoice = index !== undefined && index >= 0 ? String(index) : FREE_SET
   },
@@ -92,7 +107,9 @@ watch(
   (choice) => {
     const set = choice === FREE_SET ? undefined : knownSets.value[Number(choice)]
     if (set) {
-      draft.setCode = set.code
+      // Garde le code saisi ou lu s'il désigne la même impression (seule la région diffère).
+      const sameKey = draft.setCode !== '' && setCodeKey(draft.setCode) === setCodeKey(set.code)
+      if (!sameKey) draft.setCode = set.code
       draft.rarity = set.rarity
     }
   },
