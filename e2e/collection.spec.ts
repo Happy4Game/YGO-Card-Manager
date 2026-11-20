@@ -21,7 +21,7 @@ test("pré-remplit le code d'impression depuis ?set= puis nettoie l'URL", async 
 
   const form = page.getByRole('form', { name: 'Ajouter une carte' })
   await expect(form.getByLabel('Identifiant de la carte (passcode)')).toHaveValue('12345678')
-  await expect(form.getByLabel("Code d'impression")).toHaveValue('TST-FR002')
+  await expect(form.getByLabel('Code de la carte')).toHaveValue('TST-FR002')
 
   await form.getByRole('button', { name: 'Annuler' }).click()
   await expect(form).toBeHidden()
@@ -36,7 +36,10 @@ test('ajoute, incrémente puis supprime une entrée', async ({ page }) => {
   await expect(form.getByLabel('Identifiant de la carte (passcode)')).toHaveValue('12345678')
   await expect(form.getByText('Carte #12345678 : nom inconnu')).toBeVisible()
 
-  await form.getByLabel("Code d'impression").fill('TST-FR001')
+  // Le code de la carte est demandé avant l'enregistrement.
+  await form.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(form.getByText('Indique le code imprimé sur la carte')).toBeVisible()
+  await form.getByLabel('Code de la carte').fill('tst-fr001')
   await form.getByLabel('Langue').selectOption('fr')
   await form.getByLabel('État').selectOption('Near Mint')
   await form.getByLabel('Emplacement').fill('Classeur test')

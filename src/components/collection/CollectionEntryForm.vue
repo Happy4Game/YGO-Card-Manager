@@ -9,16 +9,9 @@ import {
   type NewCollectionEntry,
 } from '@/services/collection'
 import { CONDITION_LABELS } from './labels'
-import { db } from '@/db/database'
-import { listRarities } from '@/services/rarities'
+import PrintFields from '@/components/common/PrintFields.vue'
 import { pickPrint, readDefaults } from '@/services/quickAdd'
-import { setCodeKey } from '@/domain/setCode'
-
-/** Raretés connues (déduites des cartes téléchargées), proposées dans la liste du champ. */
-const rarities = ref<string[]>([])
-onMounted(async () => {
-  rarities.value = await listRarities(db)
-})
+import { isSetCode } from '@/domain/setCode'
 
 const props = defineProps<{
   /** Entrée à modifier ; absente pour un ajout. */
@@ -41,16 +34,12 @@ const isEdit = computed(() => props.entry !== undefined)
 const uid = useId()
 const fieldId = (name: string) => `${uid}-${name}`
 
-/** Valeur choisie dans la liste des impressions : index dans `card.sets`, ou saisie libre. */
-const FREE_SET = 'free'
-
 /** Pour un ajout : derniers réglages utilisés (langue, état, emplacement). */
 const defaults = props.entry ? undefined : readDefaults()
 
 const draft = reactive({
   // Champ texte : un <input type="number"> vide ne vaut pas un nombre, on convertit à l'envoi.
   cardId: String(props.entry?.cardId ?? props.initialCardId ?? ''),
-  setChoice: FREE_SET,
   setCode: props.entry?.setCode ?? props.initialSetCode ?? '',
   rarity: props.entry?.rarity ?? '',
   language: props.entry?.language ?? defaults?.language ?? 'fr',
@@ -81,14 +70,6 @@ watch(
       draft.setCode = print.code
       draft.rarity = print.rarity
     }
-    // Comparaison sans la région (« LOB-FR001 » = « LOB-EN001 ») : même impression.
-    const key = draft.setCode ? setCodeKey(draft.setCode) : undefined
-    const index = found?.sets.findIndex(
-      (set) =>
-        (set.code === draft.setCode || (key !== undefined && setCodeKey(set.code) === key)) &&
-        (draft.rarity === '' || set.rarity === draft.rarity),
-    )
-    draft.setChoice = index !== undefined && index >= 0 ? String(index) : FREE_SET
   },
   { immediate: true },
 )
@@ -102,48 +83,8 @@ const cardHint = computed(() => {
 })
 const knownSets = computed(() => card.value?.sets ?? [])
 
-/**
- * Rareté : liste déroulante des raretés déjà existantes, celles des impressions de cette
- * carte en premier, avec « Autre… » pour en saisir une nouvelle. Le choix d'une impression
- * pré-remplit la rareté, qui reste modifiable (ex. une réimpression dans une autre rareté).
- */
-const OTHER_RARITY = '__other__'
-const rarityFree = ref(false)
-const cardRarities = computed(() => [
-  ...new Set(knownSets.value.map((set) => set.rarity).filter(Boolean)),
-])
-const otherRarities = computed(() => {
-  const list = rarities.value.filter((rarity) => !cardRarities.value.includes(rarity))
-  // Une rareté saisie auparavant reste sélectionnable même si elle n'est plus connue.
-  const current = draft.rarity.trim()
-  if (current && !cardRarities.value.includes(current) && !list.includes(current)) {
-    list.unshift(current)
-  }
-  return list
-})
-const rarityChoice = computed({
-  get: () => (rarityFree.value ? OTHER_RARITY : draft.rarity),
-  set: (value: string) => {
-    rarityFree.value = value === OTHER_RARITY
-    if (!rarityFree.value) draft.rarity = value
-  },
-})
-
-watch(
-  () => draft.setChoice,
-  (choice) => {
-    const set = choice === FREE_SET ? undefined : knownSets.value[Number(choice)]
-    if (set) {
-      // Garde le code saisi ou lu s'il désigne la même impression (seule la région diffère).
-      const sameKey = draft.setCode !== '' && setCodeKey(draft.setCode) === setCodeKey(set.code)
-      if (!sameKey) draft.setCode = set.code
-      draft.rarity = set.rarity
-      rarityFree.value = false
-    }
-  },
-)
-
 const errorMessage = ref('')
+const codeError = ref('')
 
 function submit() {
   const cardId = parsedCardId.value
@@ -151,6 +92,15 @@ function submit() {
     errorMessage.value = "Indique l'identifiant de la carte (nombre entier positif)."
     return
   }
+  // Ajout : le code de la carte est demandé (il identifie l'impression et sa rareté).
+  // Modification : une ancienne entrée sans code reste modifiable.
+  const code = draft.setCode.trim()
+  if ((!isEdit.value || code !== '') && !isSetCode(code)) {
+    codeError.value = code === '' ? 'Indique le code imprimé sur la carte (ex. LOB-FR001).' : ''
+    errorMessage.value = 'Vérifie le code de la carte.'
+    return
+  }
+  codeError.value = ''
   if (!Number.isInteger(draft.quantity) || draft.quantity < 1) {
     errorMessage.value = 'La quantité doit être un entier supérieur ou égal à 1.'
     return
@@ -158,7 +108,7 @@ function submit() {
   errorMessage.value = ''
   emit('submit', {
     cardId,
-    setCode: draft.setCode,
+    setCode: code,
     rarity: draft.rarity.trim(),
     language: draft.language,
     condition: draft.condition,
@@ -201,63 +151,13 @@ onMounted(() => heading.value?.focus())
       </p>
     </div>
 
-    <div v-if="knownSets.length > 0" class="field field--wide">
-      <label :for="fieldId('set-choice')">Impression</label>
-      <select :id="fieldId('set-choice')" v-model="draft.setChoice">
-        <option
-          v-for="(set, index) in knownSets"
-          :key="`${set.code}-${index}`"
-          :value="String(index)"
-        >
-          {{ set.code }} — {{ set.name }} ({{ set.rarity }})
-        </option>
-        <option :value="FREE_SET">Autre (saisie libre)</option>
-      </select>
-    </div>
-
-    <div v-if="draft.setChoice === FREE_SET" class="field">
-      <label :for="fieldId('set-code')">Code d'impression</label>
-      <input
-        :id="fieldId('set-code')"
-        v-model="draft.setCode"
-        type="text"
-        autocomplete="off"
-        autocapitalize="characters"
-        spellcheck="false"
-        placeholder="ex. ABC-FR001"
-      />
-    </div>
-
-    <div class="field">
-      <label :for="fieldId('rarity-choice')">Rareté</label>
-      <!-- <optgroup> regroupe les options sous un titre lu par les lecteurs d'écran.
-           Doc : https://developer.mozilla.org/fr/docs/Web/HTML/Element/optgroup -->
-      <select :id="fieldId('rarity-choice')" v-model="rarityChoice">
-        <option value="">Non précisée</option>
-        <optgroup v-if="cardRarities.length > 0" label="Raretés de cette carte">
-          <option v-for="rarity in cardRarities" :key="rarity" :value="rarity">
-            {{ rarity }}
-          </option>
-        </optgroup>
-        <optgroup v-if="otherRarities.length > 0" label="Toutes les raretés">
-          <option v-for="rarity in otherRarities" :key="rarity" :value="rarity">
-            {{ rarity }}
-          </option>
-        </optgroup>
-        <option :value="OTHER_RARITY">Autre (saisie libre)…</option>
-      </select>
-    </div>
-
-    <div v-if="rarityFree" class="field">
-      <label :for="fieldId('rarity')">Nouvelle rareté</label>
-      <input
-        :id="fieldId('rarity')"
-        v-model="draft.rarity"
-        type="text"
-        autocomplete="off"
-        placeholder="ex. Starlight Rare"
-      />
-    </div>
+    <PrintFields
+      v-model:code="draft.setCode"
+      v-model:rarity="draft.rarity"
+      :sets="knownSets"
+      :id-prefix="fieldId('print')"
+      :code-error="codeError"
+    />
 
     <div class="field">
       <label :for="fieldId('language')">Langue</label>

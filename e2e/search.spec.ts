@@ -97,11 +97,16 @@ test('recherche universelle, code d’impression et lien d’ajout', async ({ pa
     page.getByRole('link', { name: "Détails de l'ajout pour Petit Dragon Fictif" }),
   ).toHaveAttribute('href', '/collection/?add=10000002&set=FIC-FR002')
 
-  // Ajout en un geste, puis annulation.
+  // Ajout rapide : le code cherché et sa rareté sont pré-remplis, on valide, puis on annule.
   const quickAdd = page.getByRole('button', {
     name: 'Ajouter un exemplaire de Petit Dragon Fictif à ma collection',
   })
   await quickAdd.click()
+  await expect(quickAdd).toHaveAttribute('aria-expanded', 'true')
+  const panel = page.getByRole('form', { name: 'Ajouter Petit Dragon Fictif' })
+  await expect(panel.getByLabel('Code de la carte')).toHaveValue('FIC-FR002')
+  await expect(panel.getByLabel('Rareté')).toHaveValue('Common')
+  await panel.getByRole('button', { name: "Valider l'ajout" }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Ajoutée · 1 possédée' })).toBeVisible()
   await page.getByRole('button', { name: 'Annuler' }).click()
   await expect(page.getByText('Ajout annulé.')).toBeVisible()

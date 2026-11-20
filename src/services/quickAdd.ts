@@ -5,8 +5,9 @@ import { setCodeKey } from '@/domain/setCode'
 import { addEntry, changeQuantity } from './collection'
 
 /**
- * Ajout en un geste : un exemplaire avec les derniers réglages utilisés (langue, état,
- * emplacement), sans passer par le formulaire. Le formulaire complet reste disponible.
+ * Ajout rapide : on demande seulement le code de la carte et sa rareté ; la langue, l'état
+ * et l'emplacement reprennent les derniers réglages utilisés. Le formulaire complet reste
+ * disponible.
  */
 export interface AddDefaults {
   language: string
@@ -54,7 +55,7 @@ export function rememberDefaults(defaults: AddDefaults): void {
  * impression connue. Avec plusieurs impressions et aucun indice, on laisse vide plutôt
  * que de deviner.
  */
-export function pickPrint(card: CardData, setCode?: string) {
+export function pickPrint(card: CardData, setCode?: string): Print {
   const key = setCode ? setCodeKey(setCode) : undefined
   const matched = key ? card.sets.find((set) => setCodeKey(set.code) === key) : undefined
   if (matched) return { code: setCode?.toUpperCase() ?? matched.code, rarity: matched.rarity }
@@ -63,17 +64,22 @@ export function pickPrint(card: CardData, setCode?: string) {
   return only ? { code: only.code, rarity: only.rarity } : { code: '', rarity: '' }
 }
 
+export interface Print {
+  code: string
+  rarity: string
+}
+
+/** Ajoute un exemplaire de l'impression choisie (code + rareté) avec les derniers réglages. */
 export async function quickAdd(
   db: AppDatabase,
   card: CardData,
-  setCode?: string,
+  print: Print = pickPrint(card),
   defaults: AddDefaults = readDefaults(),
 ): Promise<number> {
-  const print = pickPrint(card, setCode)
   return addEntry(db, {
     cardId: card.id,
-    setCode: print.code,
-    rarity: print.rarity,
+    setCode: print.code.trim().toUpperCase(),
+    rarity: print.rarity.trim(),
     language: defaults.language,
     condition: defaults.condition,
     quantity: 1,
