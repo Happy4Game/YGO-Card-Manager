@@ -18,6 +18,13 @@ export const router = createRouter({
       meta: { title: 'Ma collection' },
     },
     {
+      // Temporaire (avant la migration Astro) : page de scan, île Vue autonome.
+      path: '/scan',
+      name: 'scan',
+      component: () => import('@/components/pages/ScanPage.vue'),
+      meta: { title: 'Scanner' },
+    },
+    {
       path: '/about',
       name: 'about',
       component: () => import('@/views/AboutView.vue'),

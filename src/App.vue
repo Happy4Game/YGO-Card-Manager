@@ -8,6 +8,7 @@ import { RouterLink, RouterView } from 'vue-router'
     <nav aria-label="Navigation principale">
       <RouterLink to="/">Recherche</RouterLink>
       <RouterLink to="/collection">Ma collection</RouterLink>
+      <RouterLink to="/scan">Scanner</RouterLink>
       <RouterLink to="/about">À propos</RouterLink>
     </nav>
   </header>
