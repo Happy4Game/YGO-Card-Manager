@@ -94,8 +94,17 @@ test('recherche universelle, code d’impression et lien d’ajout', async ({ pa
   await expect(page.getByRole('heading', { name: 'Petit Dragon Fictif' })).toBeVisible()
   await expect(page.getByText('1 carte', { exact: true })).toBeVisible()
   await expect(
-    page.getByRole('link', { name: 'Ajouter à ma collection : Petit Dragon Fictif' }),
+    page.getByRole('link', { name: "Détails de l'ajout pour Petit Dragon Fictif" }),
   ).toHaveAttribute('href', '/collection/?add=10000002&set=FIC-FR002')
+
+  // Ajout en un geste, puis annulation.
+  const quickAdd = page.getByRole('button', {
+    name: 'Ajouter un exemplaire de Petit Dragon Fictif à ma collection',
+  })
+  await quickAdd.click()
+  await expect(page.getByRole('status').filter({ hasText: 'Ajoutée · 1 possédée' })).toBeVisible()
+  await page.getByRole('button', { name: 'Annuler' }).click()
+  await expect(page.getByText('Ajout annulé.')).toBeVisible()
 
   // Retirer la puce vide la recherche.
   await page.getByRole('button', { name: /Retirer le critère Code FIC-FR002/ }).click()

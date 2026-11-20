@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import CardImage from '@/components/common/CardImage.vue'
-import { routes } from '@/lib/routes'
+import QuickAddButton from '@/components/common/QuickAddButton.vue'
 import type { SearchHit } from '@/services/search/searchEngine'
 import {
   attributeLabel,
@@ -35,7 +35,6 @@ const details = computed(() =>
     .join(' · '),
 )
 const markers = computed(() => (card.value.linkmarkers ?? []).map(markerLabel).join(', '))
-const addHref = computed(() => routes.collectionAdd(card.value.id, props.hit.matchedSetCode))
 const headingId = computed(() => `card-${card.value.id}-name`)
 </script>
 
@@ -75,9 +74,12 @@ const headingId = computed(() => `card-${card.value.id}-name`)
         <p class="desc">{{ card.desc }}</p>
       </details>
     </div>
-    <a class="add" :href="addHref">
-      Ajouter<span class="visually-hidden"> à ma collection : {{ card.name }}</span>
-    </a>
+    <QuickAddButton
+      class="add"
+      :card="card"
+      :set-code="hit.matchedSetCode"
+      :owned="hit.ownedQuantity"
+    />
   </article>
 </template>
 
@@ -204,25 +206,9 @@ dd {
 }
 .add {
   grid-area: add;
-  justify-self: end;
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.5rem;
-  padding: var(--space-1) var(--space-4);
-  border-radius: var(--radius-pill);
-  background: var(--color-primary);
-  color: var(--color-primary-contrast);
-  font-weight: 600;
-  text-decoration: none;
+  justify-self: stretch;
 }
-.add::before {
-  content: '+';
-  margin-right: var(--space-1);
-  font-size: var(--text-lg);
-  line-height: 1;
-}
-summary:focus-visible,
-.add:focus-visible {
+summary:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }

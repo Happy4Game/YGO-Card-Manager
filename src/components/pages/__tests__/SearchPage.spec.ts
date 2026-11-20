@@ -46,7 +46,7 @@ describe('SearchPage', () => {
     await wrapper.get('#universal-search').setValue('golem atk>=2000')
     await vi.waitFor(() => expect(wrapper.find('.results [role="status"]').text()).toBe('1 carte'))
     expect(wrapper.text()).toContain('ATK ≥ 2000')
-    expect(wrapper.get('a.add').attributes('href')).toBe('/collection/?add=1')
+    expect(wrapper.get('a.quick-add__more').attributes('href')).toBe('/collection/?add=1')
 
     // Retirer la puce « ATK ≥ 2000 » réécrit la saisie.
     await lastOf(wrapper.findAll('button.remove'))?.trigger('click')
