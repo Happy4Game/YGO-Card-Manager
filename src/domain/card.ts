@@ -16,6 +16,8 @@ export interface CardData {
   /** Passcode à 8 chiffres, identifiant stable de la carte. */
   id: number
   name: string
+  /** Nom anglais (champ `name_en` des réponses traduites), seulement s'il diffère de `name`. */
+  nameEn?: string
   /** Type complet renvoyé par l'API, ex. "Effect Monster", "Spell Card". */
   type: string
   /** Libellé lisible du type dans la langue téléchargée (champ `humanReadableCardType`). */

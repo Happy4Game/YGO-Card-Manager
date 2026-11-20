@@ -109,6 +109,10 @@ export function toCardData(raw: unknown): CardData {
   }
 
   // On n'ajoute les champs facultatifs que s'ils existent, pour garder des objets compacts.
+  // Les réponses traduites (ex. `language=fr`) contiennent aussi le nom anglais : on le garde
+  // pour chercher dans les deux langues à la fois.
+  const nameEn = optionalString(raw.name_en)
+  if (nameEn !== undefined && nameEn !== name) card.nameEn = nameEn
   const typeLabel = optionalString(raw.humanReadableCardType)
   if (typeLabel !== undefined) card.typeLabel = typeLabel
   const attribute = optionalString(raw.attribute)
