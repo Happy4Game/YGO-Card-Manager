@@ -9,22 +9,38 @@ import {
   type Rect,
 } from '@/services/scan/cardFrame'
 import { captureZone, type CaptureOptions } from '@/services/scan/frameCapture'
+import { captureWhole, type InkPolarity } from '@/services/scan/multiScan'
 
 /**
- * Viseur : la vidéo de la caméra plein cadre, un cadre au format carte et les zones lues
- * (code d'impression, nom) mises en évidence. Le parent récupère des images via `capture()`.
+ * Viseur : la vidéo de la caméra plein cadre, et par-dessus les codes détectés, entourés en
+ * temps réel. Une image figée (bouton « photo » ou photo importée) peut remplacer la vidéo.
+ * Le parent récupère des images via `captureFrame()` (image entière) ou `capture()` (zone).
  */
+export interface OverlayBox {
+  key: string
+  /** Position en pixels de l'image affichée (vidéo ou image figée). */
+  box: Rect
+  label: string
+  /** « confirmed » : lu plusieurs fois ou sur la photo ; « seen » : lu une fois, à confirmer. */
+  state: 'seen' | 'confirmed' | 'unknown'
+}
+
 const props = defineProps<{
   stream: MediaStream | undefined
   /** « success » déclenche l'animation de lecture réussie. */
   mode: 'idle' | 'scanning' | 'success' | 'paused'
-  /** Nombre de lectures identiques en cours (0, 1, 2…) : la zone du code s'illumine. */
-  streak: number
+  /** Codes à entourer. */
+  boxes?: OverlayBox[]
+  /** Image figée affichée à la place de la vidéo (URL d'objet + taille en pixels). */
+  still?: { url: string; width: number; height: number }
+  /** Cadre au format carte (pour « Lire le nom », qui lit une seule carte centrée). */
+  guide?: boolean
 }>()
 
 const container = useTemplateRef<HTMLDivElement>('container')
 const video = useTemplateRef<HTMLVideoElement>('video')
 const size = ref({ width: 0, height: 0 })
+const videoSize = ref({ width: 0, height: 0 })
 
 let observer: ResizeObserver | undefined
 onMounted(() => {
@@ -56,59 +72,107 @@ watch(
   { flush: 'post' },
 )
 
-const frame = computed(() => cardFrameInBox(size.value.width, size.value.height))
-const px = (rect: Rect) => ({
-  left: `${rect.x}px`,
-  top: `${rect.y}px`,
-  width: `${rect.width}px`,
-  height: `${rect.height}px`,
-})
-const frameStyle = computed(() => px(frame.value))
-const codeStyle = computed(() =>
-  px({
-    x: CARD_ZONES.code.x * frame.value.width,
-    y: CARD_ZONES.code.y * frame.value.height,
-    width: CARD_ZONES.code.width * frame.value.width,
-    height: CARD_ZONES.code.height * frame.value.height,
-  }),
-)
-const nameStyle = computed(() =>
-  px({
-    x: CARD_ZONES.name.x * frame.value.width,
-    y: CARD_ZONES.name.y * frame.value.height,
-    width: CARD_ZONES.name.width * frame.value.width,
-    height: CARD_ZONES.name.height * frame.value.height,
-  }),
-)
+function onVideoSize() {
+  const element = video.value
+  if (element) videoSize.value = { width: element.videoWidth, height: element.videoHeight }
+}
 
-/** Image préparée pour l'OCR de la zone demandée, ou undefined si la vidéo n'est pas prête. */
-function capture(zone: CardZone, options?: CaptureOptions): HTMLCanvasElement | undefined {
+/**
+ * Repère du calque : mêmes coordonnées que l'image affichée. Avec `object-fit: cover` côté
+ * vidéo et `preserveAspectRatio="xMidYMid slice"` côté SVG, l'image et le calque sont
+ * agrandis et rognés de la même façon : un rectangle en pixels d'image tombe pile dessus.
+ * Doc MDN : https://developer.mozilla.org/fr/docs/Web/SVG/Attribute/preserveAspectRatio
+ */
+const overlaySize = computed(() => props.still ?? videoSize.value)
+const viewBox = computed(
+  () => `0 0 ${String(overlaySize.value.width)} ${String(overlaySize.value.height)}`,
+)
+/** Épaisseur des traits et taille du texte, proportionnelles à l'image (lisibles partout). */
+const unit = computed(() => Math.max(overlaySize.value.width, overlaySize.value.height) / 300)
+
+const frame = computed(() => cardFrameInBox(size.value.width, size.value.height))
+const frameStyle = computed(() => ({
+  left: `${String(frame.value.x)}px`,
+  top: `${String(frame.value.y)}px`,
+  width: `${String(frame.value.width)}px`,
+  height: `${String(frame.value.height)}px`,
+}))
+
+function videoReady(): HTMLVideoElement | undefined {
   const element = video.value
   if (!element || element.readyState < 2 || element.videoWidth === 0) return undefined
+  return element
+}
+
+/** Zone d'une carte cadrée au centre (lecture du nom), préparée pour l'OCR. */
+function capture(zone: CardZone, options?: CaptureOptions): HTMLCanvasElement | undefined {
+  const element = videoReady()
+  if (!element) return undefined
   const media = { width: element.videoWidth, height: element.videoHeight }
   const rect = containerRectToMedia(zoneInFrame(frame.value, CARD_ZONES[zone]), size.value, media)
   return captureZone(element, media, rect, options)
 }
 
-defineExpose({ capture })
+/** Image entière de la vidéo, pour chercher tous les codes visibles. */
+function captureFrame(options?: { maxSide?: number; maxScale?: number; polarity?: InkPolarity }) {
+  const element = videoReady()
+  if (!element) return undefined
+  return captureWhole(element, { width: element.videoWidth, height: element.videoHeight }, options)
+}
+
+defineExpose({ capture, captureFrame, videoElement: () => videoReady() })
 </script>
 
 <template>
   <div ref="container" class="viewfinder" :data-mode="mode">
     <!-- playsinline : indispensable sur iPhone, sinon la vidéo s'ouvre en plein écran.
          muted : autorise la lecture automatique. Doc : https://webkit.org/blog/6784/new-video-policies-for-ios/ -->
-    <video ref="video" class="video" playsinline muted autoplay aria-hidden="true"></video>
-    <div class="frame" :style="frameStyle" aria-hidden="true">
+    <video
+      ref="video"
+      class="video"
+      playsinline
+      muted
+      autoplay
+      aria-hidden="true"
+      @loadedmetadata="onVideoSize"
+      @resize="onVideoSize"
+    ></video>
+    <img v-if="still" class="still" :src="still.url" alt="" />
+
+    <svg
+      v-if="overlaySize.width > 0 && (boxes?.length ?? 0) > 0"
+      class="boxes"
+      :viewBox="viewBox"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <g v-for="item in boxes" :key="item.key" :class="['box', `box--${item.state}`]">
+        <rect
+          :x="item.box.x - unit * 2"
+          :y="item.box.y - unit * 2"
+          :width="item.box.width + unit * 4"
+          :height="item.box.height + unit * 4"
+          :rx="unit * 1.5"
+          :stroke-width="unit"
+        />
+        <text
+          :x="item.box.x - unit * 2"
+          :y="item.box.y - unit * 4"
+          :font-size="unit * 7"
+          :stroke-width="unit * 1.6"
+        >
+          {{ item.label }}
+        </text>
+      </g>
+    </svg>
+
+    <div v-if="guide" class="frame" :style="frameStyle" aria-hidden="true">
       <span class="corner tl"></span>
       <span class="corner tr"></span>
       <span class="corner bl"></span>
       <span class="corner br"></span>
-      <span class="zone zone-name" :style="nameStyle"></span>
-      <span class="zone zone-code" :class="{ warm: streak > 0 }" :style="codeStyle">
-        <span class="zone-label">code</span>
-      </span>
-      <span v-if="mode === 'scanning'" class="sweep"></span>
     </div>
+    <span v-if="mode === 'scanning'" class="sweep" aria-hidden="true"></span>
     <slot></slot>
   </div>
 </template>
@@ -137,8 +201,6 @@ defineExpose({ capture })
 .frame {
   position: absolute;
   border-radius: calc(var(--radius-md) * 0.8);
-  /* Assombrit tout ce qui est hors du cadre (ombre géante coupée par overflow: hidden). */
-  box-shadow: 0 0 0 100vmax rgb(3 6 12 / 0.55);
   outline: 1px solid rgb(255 255 255 / 0.35);
   transition:
     outline-color var(--transition-fast),
@@ -185,34 +247,43 @@ defineExpose({ capture })
   border-bottom-left-radius: 0;
 }
 
-.zone {
+/* Image figée : même cadrage que la vidéo (object-fit: cover). */
+.still {
   position: absolute;
-  border-radius: var(--radius-sm);
-  border: 2px dashed rgb(255 255 255 / 0.55);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-.zone-code {
-  border-style: solid;
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast);
-}
-.zone-code.warm {
-  background: color-mix(in srgb, var(--color-accent) 32%, transparent);
-}
-.zone-label {
+
+/* Calque des codes détectés, aux mêmes coordonnées que l'image. */
+.boxes {
   position: absolute;
-  right: 0;
-  bottom: calc(100% + 2px);
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-sm);
-  background: var(--color-accent);
-  color: #111;
-  font-size: 0.7rem;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.box rect {
+  fill: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  stroke: var(--color-accent);
+}
+.box--confirmed rect {
+  fill: color-mix(in srgb, var(--color-success) 22%, transparent);
+  stroke: var(--color-success);
+}
+.box--unknown rect {
+  fill: transparent;
+  stroke: #fff;
+  stroke-dasharray: 4 3;
+}
+/* Étiquette lisible sur n'importe quel fond : texte blanc cerclé de noir. */
+.box text {
+  fill: #fff;
+  stroke: rgb(0 0 0 / 0.75);
+  paint-order: stroke;
+  font-family: var(--font-sans);
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 /* Ligne de balayage : indique que la lecture est en cours. */
@@ -222,6 +293,7 @@ defineExpose({ capture })
   right: 4%;
   height: 2px;
   top: 0;
+  z-index: 1;
   border-radius: 2px;
   background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
   box-shadow: 0 0 12px var(--color-primary);

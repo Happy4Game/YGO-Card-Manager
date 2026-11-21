@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef } from 'vue'
 import ScanResultSheet from '@/components/scan/ScanResultSheet.vue'
-import ScanViewfinder from '@/components/scan/ScanViewfinder.vue'
-import type { SheetContent } from '@/components/scan/types'
+import ScanTray from '@/components/scan/ScanTray.vue'
+import ScanViewfinder, { type OverlayBox } from '@/components/scan/ScanViewfinder.vue'
+import type { DetectedCard, SheetContent } from '@/components/scan/types'
 import { db } from '@/db/database'
 import type { CardData } from '@/domain/card'
 import { routes } from '@/lib/routes'
@@ -19,7 +20,15 @@ import {
 } from '@/services/scan/camera'
 import { CARD_ZONES, cardFrameInBox, zoneInFrame } from '@/services/scan/cardFrame'
 import { captureZone, loadPhoto } from '@/services/scan/frameCapture'
-import { countCards, loadNameIndex, resolveCandidates } from '@/services/scan/lookup'
+import { countCards, loadNameIndex, matchingSet, resolveCandidates } from '@/services/scan/lookup'
+import {
+  captureWhole,
+  codesInLines,
+  createDetectionTracker,
+  resolveDetections,
+  type CodeDetection,
+  type ResolvedDetection,
+} from '@/services/scan/multiScan'
 import { bestNameMatches, type NameCandidate } from '@/services/scan/nameMatch'
 import type { OcrEngine, OcrProgress } from '@/services/scan/ocrEngine'
 import { normalizeManualCode, setCodeCandidates } from '@/services/scan/ocrText'
@@ -31,11 +40,14 @@ import {
   type RecentScan,
 } from '@/services/scan/recentScans'
 import { createScanLoop } from '@/services/scan/scanLoop'
-import { createStabilityTracker } from '@/services/scan/stability'
+import { takeStill } from '@/services/scan/still'
+import { quickAdd } from '@/services/quickAdd'
 
 /**
- * Page « Scanner » : on pointe la caméra sur une carte, le code d'impression est lu sur
- * l'appareil (OCR), puis on ajoute la carte à sa collection en un geste.
+ * Page « Scanner » : on pointe la caméra sur une ou plusieurs cartes ; les codes d'impression
+ * sont lus sur l'appareil (OCR) et entourés en direct. Le bouton « photo » fige l'image et
+ * la lit en haute résolution. Les cartes reconnues s'empilent dans « Cartes détectées »,
+ * puis s'ajoutent à la collection d'un coup.
  * Repli : photo importée, lecture du nom, ou saisie manuelle du code.
  */
 
@@ -60,7 +72,15 @@ let engine: Promise<OcrEngine> | undefined
 
 const sheet = shallowRef<SheetContent>()
 const flash = ref(false)
-const streak = ref(0)
+/** Codes entourés sur la vidéo (ou sur l'image figée). */
+const boxes = ref<OverlayBox[]>([])
+/** Image figée (bouton « photo » ou photo importée), affichée à la place de la vidéo. */
+const still = shallowRef<{ url: string; width: number; height: number }>()
+/** Cartes reconnues, en attente d'ajout. */
+const detected = ref<DetectedCard[]>([])
+const adding = ref(false)
+/** « Lire le nom » : un cadre au format carte apparaît pour centrer une seule carte. */
+const guide = ref(false)
 const showNameHint = ref(false)
 const busyLabel = ref('')
 const announcement = ref('')
@@ -70,15 +90,15 @@ const recent = ref<RecentScan[]>(loadRecentScans(sessionStore()))
 let photo: ImageBitmap | undefined
 let nameIndex: Promise<NameCandidate[]> | undefined
 
-const tracker = createStabilityTracker({ required: 2 })
+const tracker = createDetectionTracker({ required: 2 })
 let scanStartedAt = 0
 let tickCount = 0
 let resumeOnVisible = false
 
 const viewMode = computed(() => {
   if (flash.value) return 'success'
-  if (cameraState.value !== 'live') return 'idle'
-  return sheet.value || busyLabel.value ? 'paused' : 'scanning'
+  if (cameraState.value !== 'live' && !still.value) return 'idle'
+  return sheet.value || busyLabel.value || still.value ? 'paused' : 'scanning'
 })
 /** HTTPS et navigateur compatible : sinon seuls la photo et la saisie sont proposées. */
 const cameraUsable = cameraAvailability() === 'ok'
@@ -125,7 +145,7 @@ async function openCamera(deviceId?: string) {
     camera.value = session
     torchOn.value = false
     cameraState.value = 'live'
-    announce('Caméra active. Place la carte dans le cadre.')
+    announce('Caméra active. Montre une ou plusieurs cartes, codes visibles.')
     cameras.value = await listCameras().catch(() => [])
     void getEngine().catch(() => undefined)
     startScanning()
@@ -138,6 +158,7 @@ async function openCamera(deviceId?: string) {
 
 function closeCamera() {
   loop.stop()
+  boxes.value = []
   stopStream(camera.value?.stream)
   camera.value = undefined
 }
@@ -186,50 +207,192 @@ const loop = createScanLoop(scanStep, {
 
 function startScanning() {
   tracker.reset()
-  streak.value = 0
+  boxes.value = []
   showNameHint.value = false
   scanStartedAt = Date.now()
-  if (cameraState.value === 'live') loop.start()
+  if (cameraState.value === 'live' && !still.value) loop.start()
 }
 
-async function scanStep() {
-  if (sheet.value || busyLabel.value) return
-  const ocr = await getEngine()
-  tickCount += 1
-  // Une image sur quatre : lecture large du bas de la carte (code des cartes Pendule).
-  const wide = tickCount % 4 === 0
-  const image = viewfinder.value?.capture(wide ? 'lower' : 'code', {
-    targetHeight: wide ? 360 : 96,
-  })
-  if (!image || sheet.value) return
-  const reading = wide ? await ocr.readSparse(image) : await ocr.readCode(image)
-  if (sheet.value || !loop.running) return
+const boxLabel = (item: ResolvedDetection) => item.cards[0]?.name ?? item.code
 
-  const resolution = await resolveCandidates(db, setCodeCandidates(reading.text))
-  const accepted = tracker.push(resolution?.code, Date.now())
-  streak.value = tracker.streak
-  // Un code inconnu de la base exige une lecture de plus (évite d'afficher un faux code).
-  if (accepted && resolution && (resolution.cards.length > 0 || tracker.streak >= 3)) {
-    await showResolution(resolution.code, resolution.cards)
-  } else if (Date.now() - scanStartedAt > HINT_DELAY_MS) {
+/** Une image de la vidéo : tous les codes visibles, entourés en direct. */
+async function scanStep() {
+  if (sheet.value || busyLabel.value || still.value) return
+  const ocr = await getEngine()
+  // Une image sur trois cherche du texte clair (code blanc des cartes Xyz).
+  tickCount += 1
+  const polarity = tickCount % 3 === 0 ? 'light' : 'dark'
+  const frame = viewfinder.value?.captureFrame({ maxSide: 1920, polarity })
+  if (!frame) return
+  const lines = await ocr.findLines(frame.canvas)
+  if (!loop.running || still.value) return
+  const resolved = await resolveDetections(db, codesInLines(lines, frame.scale))
+  const { visible, confirmed } = tracker.update(resolved, Date.now())
+  boxes.value = visible.map((item) => ({
+    key: item.key,
+    box: item.box,
+    label: item.confirmed ? `✓ ${boxLabel(item)}` : item.code,
+    state: item.cards.length === 0 ? 'unknown' : item.confirmed ? 'confirmed' : 'seen',
+  }))
+  const added = confirmed.filter((item) => item.cards.length > 0 && addDetected(item))
+  if (added.length > 0) {
+    celebrate()
+    announce(
+      added.length === 1
+        ? `Carte détectée : ${boxLabel(added[0] as ResolvedDetection)}.`
+        : `${String(added.length)} cartes détectées.`,
+    )
+    scanStartedAt = Date.now()
+  } else if (detected.value.length === 0 && Date.now() - scanStartedAt > HINT_DELAY_MS) {
     showNameHint.value = true
   }
 }
 
-async function showResolution(code: string, cards: CardData[]) {
-  loop.stop()
+function celebrate() {
   flash.value = true
   // Retour haptique discret (Android). Doc MDN : https://developer.mozilla.org/fr/docs/Web/API/Navigator/vibrate
   if ('vibrate' in navigator) navigator.vibrate(50)
   setTimeout(() => (flash.value = false), 450)
-  openSheet({ kind: 'code', code, cards })
-  announce(
-    cards.length === 1
-      ? `Code lu : ${code}. ${cards[0]?.name ?? ''}`
-      : cards.length > 1
-        ? `Code lu : ${code}. ${String(cards.length)} cartes possibles.`
-        : `Code lu : ${code}. Aucune carte connue pour ce code.`,
+}
+
+/** Ajoute une détection à « Cartes détectées » (une ligne par code). Renvoie true si nouvelle. */
+function addDetected(item: ResolvedDetection): boolean {
+  if (detected.value.some((entry) => entry.key === item.key)) return false
+  const card = item.cards[0]
+  detected.value = [
+    {
+      key: item.key,
+      code: item.code,
+      cards: item.cards,
+      cardId: card?.id,
+      rarity: card ? (matchingSet(card, item.code)?.rarity ?? '') : '',
+      selected: card !== undefined,
+    },
+    ...detected.value,
+  ]
+  if (card && item.cards.length === 1) rememberScan(card, item.code)
+  return true
+}
+
+function updateDetected(key: string, changes: Partial<DetectedCard>) {
+  detected.value = detected.value.map((item) => {
+    if (item.key !== key) return item
+    const next = { ...item, ...changes }
+    // Autre carte choisie : on reprend la rareté de son impression.
+    const card = next.cards.find((entry) => entry.id === next.cardId)
+    if (changes.cardId !== undefined && card) {
+      next.rarity = matchingSet(card, next.code)?.rarity ?? ''
+    }
+    return next
+  })
+}
+
+function removeDetected(key: string) {
+  detected.value = detected.value.filter((item) => item.key !== key)
+}
+
+/** Ajoute les cartes cochées (un exemplaire chacune, derniers réglages de langue et d'état). */
+async function addSelected() {
+  const chosen = detected.value.filter((item) => item.selected && item.cardId !== undefined)
+  if (chosen.length === 0) return
+  adding.value = true
+  try {
+    for (const item of chosen) {
+      const card = item.cards.find((entry) => entry.id === item.cardId)
+      if (card) await quickAdd(db, card, { code: item.code, rarity: item.rarity })
+    }
+    const done = new Set(chosen.map((item) => item.key))
+    detected.value = detected.value.filter((item) => !done.has(item.key))
+    announce(
+      chosen.length === 1
+        ? '1 carte ajoutée à ta collection.'
+        : `${String(chosen.length)} cartes ajoutées à ta collection.`,
+    )
+  } catch (error) {
+    console.error('[scan]', error)
+    announce("L'ajout a échoué. Réessaie.")
+  } finally {
+    adding.value = false
+  }
+}
+
+// --- Image figée (bouton « photo » ou photo importée) -----------------------------------------
+async function showStill(bitmap: ImageBitmap) {
+  const canvas = captureWhole(bitmap, bitmap, { maxSide: 1600, polarity: false }).canvas
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, 'image/jpeg', 0.85),
   )
+  clearStill()
+  if (blob) {
+    // URL locale vers l'image (aucun envoi) : https://developer.mozilla.org/fr/docs/Web/API/URL/createObjectURL_static
+    still.value = { url: URL.createObjectURL(blob), width: bitmap.width, height: bitmap.height }
+  }
+}
+
+function clearStill() {
+  if (still.value) URL.revokeObjectURL(still.value.url)
+  still.value = undefined
+}
+
+/** Lecture soignée d'une image figée : plus grande résolution, chaque code lu une fois suffit. */
+async function analyzeStill(bitmap: ImageBitmap): Promise<number> {
+  const ocr = await getEngine()
+  // Jusqu'à 3 200 px de côté, agrandie ×2 au plus : les petits codes deviennent lisibles.
+  const detections: CodeDetection[] = []
+  // Deux passes : texte sombre (cas courant), puis texte clair (cartes Xyz).
+  for (const polarity of ['dark', 'light'] as const) {
+    const { canvas, scale } = captureWhole(bitmap, bitmap, { maxSide: 3200, maxScale: 2, polarity })
+    detections.push(...codesInLines(await ocr.findLines(canvas), scale))
+  }
+  const resolved = await resolveDetections(db, detections)
+  boxes.value = resolved.map((item) => ({
+    key: item.key,
+    box: item.box,
+    label: item.cards.length > 0 ? `✓ ${boxLabel(item)}` : `? ${item.code}`,
+    state: item.cards.length > 0 ? 'confirmed' : 'unknown',
+  }))
+  for (const item of resolved) addDetected(item)
+  return resolved.filter((item) => item.cards.length > 0).length
+}
+
+function foundMessage(count: number, source: string) {
+  return count === 0
+    ? `Aucun code reconnu sur ${source}. Rapproche-toi, évite les reflets, ou saisis le code.`
+    : `${String(count)} carte${count > 1 ? 's' : ''} reconnue${count > 1 ? 's' : ''} sur ${source}.`
+}
+
+/** Bouton « photo » : fige l'image, la prend en pleine résolution si possible, puis la lit. */
+async function takePhoto() {
+  const element = viewfinder.value?.videoElement()
+  if (!element || busyLabel.value) return
+  loop.stop()
+  busyLabel.value = 'Analyse de la photo…'
+  announce('Photo prise, analyse en cours…')
+  try {
+    const bitmap = await takeStill(camera.value?.track, element)
+    await showStill(bitmap)
+    const count = await analyzeStill(bitmap)
+    bitmap.close()
+    if (count > 0) celebrate()
+    announce(foundMessage(count, 'la photo'))
+  } catch (error) {
+    console.error('[scan]', error)
+    announce('La photo n’a pas pu être analysée. Réessaie.')
+  } finally {
+    busyLabel.value = ''
+  }
+}
+
+/** Quitte l'image figée et reprend la vidéo en direct. */
+function resumeLive() {
+  clearStill()
+  boxes.value = []
+  if (cameraState.value === 'live') {
+    announce('Retour à la caméra.')
+    startScanning()
+  } else if (cameraUsable) {
+    void openCamera(camera.value?.deviceId)
+  }
 }
 
 function openSheet(content: SheetContent) {
@@ -252,6 +415,20 @@ function resume() {
   sheet.value = undefined
   announce(cameraState.value === 'live' ? 'Prêt pour la carte suivante.' : '')
   startScanning()
+}
+
+/** Code lu par l'OCR sur une photo, sans position : même feuille que la saisie manuelle. */
+async function showResolution(code: string, cards: CardData[]) {
+  loop.stop()
+  celebrate()
+  openSheet({ kind: 'code', code, cards })
+  announce(
+    cards.length === 1
+      ? `Code lu : ${code}. ${cards[0]?.name ?? ''}`
+      : cards.length > 1
+        ? `Code lu : ${code}. ${String(cards.length)} cartes possibles.`
+        : `Code lu : ${code}. Aucune carte connue pour ce code.`,
+  )
 }
 
 // --- Code saisi ou corrigé --------------------------------------------------------------------
@@ -285,6 +462,7 @@ function pickCard(card: CardData, code: string) {
 // --- Lecture du nom ---------------------------------------------------------------------------
 async function readName() {
   busyLabel.value = 'Lecture du nom…'
+  guide.value = true
   announce('Lecture du nom de la carte…')
   try {
     const image = photo
@@ -315,6 +493,7 @@ async function readName() {
     announce('La lecture du nom a échoué. Réessaie ou saisis le code.')
   } finally {
     busyLabel.value = ''
+    guide.value = false
   }
 }
 
@@ -342,8 +521,16 @@ async function onPhotoChosen(event: Event) {
   try {
     photo?.close()
     photo = await loadPhoto(file)
+    await showStill(photo)
+    // 1. Tous les codes de la photo (une ou plusieurs cartes, n'importe où).
+    const count = await analyzeStill(photo)
+    if (count > 0) {
+      celebrate()
+      announce(foundMessage(count, 'la photo'))
+      return
+    }
+    // 2. Repli : une seule carte cadrée, zone du code puis bas de carte.
     const ocr = await getEngine()
-    // 1. Zone du code (carte cadrée) ; 2. bas de carte ; 3. photo entière en texte épars.
     let resolution = await resolveCandidates(
       db,
       setCodeCandidates((await ocr.readCode(capturePhotoZone(photo, 'code'))).text),
@@ -352,21 +539,11 @@ async function onPhotoChosen(event: Event) {
       const lower = await ocr.readSparse(capturePhotoZone(photo, 'lower'))
       resolution = (await resolveCandidates(db, setCodeCandidates(lower.text))) ?? resolution
     }
-    if (!resolution?.cards.length) {
-      const whole = captureZone(
-        photo,
-        { width: photo.width, height: photo.height },
-        { x: 0, y: 0, width: photo.width, height: photo.height },
-        { targetHeight: Math.min(photo.height, 1600), maxSourceWidth: 1600 },
-      )
-      const sparse = await ocr.readSparse(whole)
-      resolution = (await resolveCandidates(db, setCodeCandidates(sparse.text))) ?? resolution
-    }
     if (resolution) {
       await showResolution(resolution.code, resolution.cards)
     } else {
       showNameHint.value = true
-      announce('Aucun code lu sur la photo. Essaie « Lire le nom » ou saisis le code.')
+      announce(foundMessage(0, 'la photo'))
     }
   } catch (error) {
     console.error('[scan]', error)
@@ -403,6 +580,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
   closeCamera()
+  clearStill()
   photo?.close()
   void engine?.then((ready) => ready.terminate()).catch(() => undefined)
 })
@@ -413,8 +591,9 @@ onBeforeUnmount(() => {
     <header class="intro">
       <h1 id="scan-title">Scanner une carte</h1>
       <p class="subtitle">
-        Vise le code d’impression (ex. ABC-FR001). La lecture se fait sur ton appareil : aucune
-        image n’est envoyée.
+        Montre une ou plusieurs cartes, codes d’impression visibles (ex. ABC-FR001) : ils sont
+        entourés dès qu’ils sont lus. La lecture se fait sur ton appareil : aucune image n’est
+        envoyée.
       </p>
     </header>
 
@@ -423,15 +602,36 @@ onBeforeUnmount(() => {
       <a :href="routes.search()">Télécharger la liste des cartes</a>
     </p>
 
-    <ScanViewfinder ref="viewfinder" :stream="camera?.stream" :mode="viewMode" :streak="streak">
-      <div v-if="cameraState !== 'live'" class="overlay">
+    <ScanViewfinder
+      ref="viewfinder"
+      :stream="camera?.stream"
+      :mode="viewMode"
+      :boxes="boxes"
+      :still="still"
+      :guide="guide"
+    >
+      <template v-if="still">
+        <p class="instruction" aria-hidden="true">{{ busyLabel || 'Image figée' }}</p>
+        <div class="still-bar">
+          <button
+            class="btn btn-glass"
+            type="button"
+            :disabled="busyLabel !== ''"
+            @click="resumeLive"
+          >
+            Reprendre la caméra
+          </button>
+        </div>
+      </template>
+
+      <div v-else-if="cameraState !== 'live'" class="overlay">
         <template v-if="cameraState === 'starting'">
           <span class="spinner" aria-hidden="true"></span>
           <p>Démarrage de la caméra…</p>
         </template>
         <template v-else>
           <p v-if="cameraState === 'error'" class="overlay-error">{{ cameraError }}</p>
-          <p v-else>Place la carte dans le cadre, code d’impression bien visible.</p>
+          <p v-else>Montre une ou plusieurs cartes, codes d’impression bien visibles.</p>
           <button v-if="cameraUsable" class="btn btn-primary" type="button" @click="openCamera()">
             {{ cameraState === 'error' ? 'Réessayer la caméra' : 'Activer la caméra' }}
           </button>
@@ -443,8 +643,20 @@ onBeforeUnmount(() => {
 
       <template v-else>
         <p class="instruction" aria-hidden="true">
-          {{ busyLabel || 'Place la carte dans le cadre' }}
+          {{
+            busyLabel || (guide ? 'Une seule carte dans le cadre' : 'Codes visibles, sans reflet')
+          }}
         </p>
+        <!-- Déclencheur : fige l'image et la lit en haute résolution. -->
+        <button
+          class="shutter"
+          type="button"
+          :disabled="busyLabel !== ''"
+          aria-label="Prendre une photo et lire toutes les cartes"
+          @click="takePhoto"
+        >
+          <span class="shutter__ring" aria-hidden="true"></span>
+        </button>
         <div class="tools">
           <button
             v-if="camera?.torchSupported"
@@ -513,6 +725,16 @@ onBeforeUnmount(() => {
       {{ announcement }}
     </p>
 
+    <ScanTray
+      v-if="detected.length > 0"
+      :items="detected"
+      :busy="adding"
+      @add="addSelected"
+      @remove="removeDetected"
+      @clear="detected = []"
+      @update="updateDetected"
+    />
+
     <div class="quick-actions">
       <button class="btn btn-ghost" type="button" :disabled="busyLabel !== ''" @click="readName">
         Lire le nom
@@ -520,7 +742,8 @@ onBeforeUnmount(() => {
       <button class="btn btn-ghost" type="button" @click="choosePhoto">Importer une photo</button>
     </div>
     <p v-if="showNameHint" class="hint">
-      Le code ne se lit pas ? Rapproche la carte, allume la lampe, ou essaie « Lire le nom ».
+      Le code ne se lit pas ? Rapproche les cartes, évite les reflets, prends une photo (bouton
+      rond), ou essaie « Lire le nom » avec une seule carte.
     </p>
 
     <form class="manual" aria-labelledby="manual-title" @submit.prevent="submitManual">
@@ -653,9 +876,55 @@ onBeforeUnmount(() => {
 .tools {
   position: absolute;
   right: var(--space-3);
-  bottom: var(--space-3);
+  top: var(--space-3);
   display: flex;
+  flex-direction: column;
   gap: var(--space-2);
+}
+
+/* Déclencheur façon appareil photo, en bas au centre (zone du pouce). */
+.shutter {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 4.25rem;
+  height: 4.25rem;
+  padding: 0;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.shutter__ring {
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform var(--transition-fast);
+}
+.shutter:active .shutter__ring {
+  transform: scale(0.88);
+}
+.shutter:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.shutter:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+/* Image figée : bandeau « Reprendre la caméra » en bas. */
+.still-bar {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3);
+  background: linear-gradient(transparent, rgb(5 7 11 / 0.7));
 }
 .icon-btn {
   display: grid;

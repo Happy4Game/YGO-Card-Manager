@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  adaptiveThreshold,
   binarize,
   ensureDarkTextOnLight,
   grayToRgba,
@@ -141,5 +142,33 @@ describe('scaleForHeight', () => {
     expect(scaleForHeight(48, 96)).toBe(2)
     expect(scaleForHeight(200, 96)).toBe(1)
     expect(scaleForHeight(0, 96)).toBe(1)
+  })
+})
+
+describe('adaptiveThreshold', () => {
+  // Bande gauche sombre (fond), bande droite claire avec un trait d'« encre » au milieu :
+  // un seuil global confondrait le fond sombre avec l'encre ; le seuil local, non.
+  const width = 12
+  const height = 5
+  const data = new Uint8ClampedArray(width * height)
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) data[y * width + x] = x < 6 ? 40 : x === 9 ? 120 : 220
+  }
+  const image = { width, height, data }
+
+  it('ne garde que ce qui est plus sombre que son voisinage', () => {
+    const out = adaptiveThreshold(image, { radius: 2, offset: 12 })
+    const row = out.data.slice(2 * width, 3 * width)
+    // Fond sombre uniforme : blanc. Trait plus sombre que la zone claire : noir.
+    expect(Array.from(row.slice(0, 4))).toEqual([255, 255, 255, 255])
+    expect(row[9]).toBe(0)
+    expect(row[11]).toBe(255)
+  })
+
+  it('sait lire un texte clair sur fond sombre (polarité inversée)', () => {
+    const light = { width, height, data: data.map((value) => 255 - value) }
+    const out = adaptiveThreshold(light, { radius: 2, offset: 12, polarity: 'light' })
+    expect(out.data[2 * width + 9]).toBe(0)
+    expect(out.data[2 * width + 1]).toBe(255)
   })
 })

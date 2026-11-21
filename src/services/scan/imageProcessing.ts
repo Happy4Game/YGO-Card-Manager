@@ -124,6 +124,55 @@ export function otsuThreshold(image: GrayImage): number {
   return threshold
 }
 
+/**
+ * Seuil adaptatif (moyenne locale) : un pixel devient de l'« encre » s'il est nettement plus
+ * sombre (`polarity: 'dark'`) ou plus clair (`'light'`, texte blanc des cartes Xyz) que la
+ * moyenne de son voisinage. Contrairement à un seuil global (Otsu), il résiste à une scène
+ * entière (fond, illustrations, reflets, éclairage inégal) : c'est ce qui permet de lire des
+ * codes n'importe où dans l'image. La moyenne se calcule en temps constant grâce à une image
+ * intégrale (table des sommes cumulées).
+ * Références : seuillage adaptatif — https://homepages.inf.ed.ac.uk/rbf/HIPR2/adpthrsh.htm ;
+ * image intégrale — https://en.wikipedia.org/wiki/Summed-area_table
+ *
+ * Résultat : encre noire (0) sur fond blanc (255), ce que Tesseract préfère.
+ */
+export function adaptiveThreshold(
+  image: GrayImage,
+  options: { radius: number; offset?: number; polarity?: 'dark' | 'light' },
+): GrayImage {
+  const { width, height, data } = image
+  const { radius, offset = 12, polarity = 'dark' } = options
+  const stride = width + 1
+  // integral[(y + 1) * stride + (x + 1)] = somme des pixels du rectangle [0..x] × [0..y].
+  const integral = new Float64Array(stride * (height + 1))
+  for (let y = 0; y < height; y += 1) {
+    let row = 0
+    for (let x = 0; x < width; x += 1) {
+      row += data[y * width + x] ?? 0
+      integral[(y + 1) * stride + x + 1] = (integral[y * stride + x + 1] ?? 0) + row
+    }
+  }
+  const out = new Uint8ClampedArray(data.length)
+  for (let y = 0; y < height; y += 1) {
+    const y0 = Math.max(0, y - radius)
+    const y1 = Math.min(height, y + radius + 1)
+    for (let x = 0; x < width; x += 1) {
+      const x0 = Math.max(0, x - radius)
+      const x1 = Math.min(width, x + radius + 1)
+      const sum =
+        (integral[y1 * stride + x1] ?? 0) -
+        (integral[y0 * stride + x1] ?? 0) -
+        (integral[y1 * stride + x0] ?? 0) +
+        (integral[y0 * stride + x0] ?? 0)
+      const mean = sum / ((x1 - x0) * (y1 - y0))
+      const value = data[y * width + x] ?? 0
+      const ink = polarity === 'dark' ? value < mean - offset : value > mean + offset
+      out[y * width + x] = ink ? 0 : 255
+    }
+  }
+  return { width, height, data: out }
+}
+
 /** Noir (0) si le pixel est ≤ seuil, blanc (255) sinon. */
 export function binarize(image: GrayImage, threshold: number): GrayImage {
   const out = new Uint8ClampedArray(image.data.length)
