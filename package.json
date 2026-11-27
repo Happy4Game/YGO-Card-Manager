@@ -28,7 +28,7 @@
     "@astrojs/vue": "^7.1.6",
     "@tesseract.js-data/eng": "1.0.0",
     "@tesseract.js-data/fra": "1.0.0",
-    "@vite-pwa/astro": "^2.0.3",
+    "@vite-pwa/astro": "^2.0.4",
     "astro": "^7.4.13",
     "dexie": "^4.4.7",
     "pinia": "^4.1.0",
